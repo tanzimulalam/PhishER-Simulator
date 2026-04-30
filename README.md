@@ -121,6 +121,16 @@ Inbox and investigation flow now better mirrors operational PhishER handling:
 5. PhishRIP workflow includes live progress modal and completion counts.
 6. Audit/discussion persistence captures every control click with icon, timestamp, and actor attribution.
 
+## Enterprise Workflow Upgrade
+
+This build now targets high-density enterprise SOC operation style:
+
+1. Strict three-pane architecture: Left (Rooms/Filters), Center (high-density inbox table), Right (triage/actions).
+2. Tabbed analysis view uses enterprise-friendly tabs: Preview, Headers, Auth, Links, Attachments.
+3. 50+ incident scenario engine includes CEO fraud, quishing, MFA fatigue, IT password reset lures, and clean newsletters.
+4. SOC Shift countdown (30 minutes) locks triage interactions when time expires.
+5. Instructor Answer Key toggle surfaces red-flag cues for guided debrief.
+
 ## Learning Outcomes
 
 By the end of the exercise, students should be able to:

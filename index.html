@@ -3,69 +3,89 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PhishER Simulator</title>
+  <title>KnowBe4 PhishER Simulator</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">KnowBe4 PhishER - SOC Console</div>
-    <div class="top-actions">
-      <input id="global-search" aria-label="Search incidents globally" placeholder="Search reporter, subject, sender, domain" />
-      <button id="reset-data" aria-label="Reset simulator data">Reset Data</button>
+    <div class="brand">KnowBe4 PhishER - Enterprise SOC</div>
+    <div class="top-controls">
+      <span id="shift-timer" class="timer" aria-label="SOC shift countdown">30:00</span>
+      <button id="answer-key-toggle" aria-label="Toggle instructor answer key">Instructor Key</button>
+      <button id="reset-sim" aria-label="Reset simulator">Reset</button>
     </div>
   </header>
 
-  <main class="three-pane" aria-label="Phishing incident triage interface">
-    <section class="pane pane-left" aria-label="Incident inbox pane">
-      <div class="pane-title">Inbox</div>
-      <div class="filters">
-        <label>PhishML
-          <select id="filter-phishml" aria-label="Filter by PhishML">
-            <option value="all">All</option>
-            <option value="threat">Threat</option>
-            <option value="spam">Spam</option>
-            <option value="clean">Clean</option>
-          </select>
-        </label>
-        <label>Priority
-          <select id="filter-priority" aria-label="Filter by priority">
-            <option value="all">All</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </label>
-        <label>Status
-          <select id="filter-status" aria-label="Filter by status">
-            <option value="all">All</option>
-            <option value="received">Received</option>
-            <option value="in_review">In Review</option>
-            <option value="resolved">Resolved</option>
-          </select>
-        </label>
-      </div>
-      <div id="inbox-list" class="inbox-list" role="list" aria-label="Incident list"></div>
+  <main class="layout" aria-label="Phishing triage workspace">
+    <section class="pane pane-left" aria-label="Rooms and filters">
+      <h2>Rooms / Filters</h2>
+      <label>Room
+        <select id="room-filter" aria-label="Filter by room">
+          <option value="all">All Rooms</option>
+          <option value="inbox">Inbox</option>
+          <option value="critical">Critical</option>
+          <option value="review">In Review</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </label>
+      <label>PhishML
+        <select id="phishml-filter" aria-label="Filter by PhishML">
+          <option value="all">All</option>
+          <option value="threat">Threat</option>
+          <option value="spam">Spam</option>
+          <option value="clean">Clean</option>
+        </select>
+      </label>
+      <label>Priority
+        <select id="priority-filter" aria-label="Filter by priority">
+          <option value="all">All</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </label>
+      <label>Status
+        <select id="status-filter" aria-label="Filter by status">
+          <option value="all">All</option>
+          <option value="received">Received</option>
+          <option value="in_review">In Review</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </label>
+      <label>Search
+        <input id="search-filter" aria-label="Search incidents" placeholder="Reporter, subject, sender" />
+      </label>
     </section>
 
-    <section class="pane pane-center" aria-label="Message analysis pane">
-      <div id="message-view"></div>
+    <section class="pane pane-center" aria-label="Incident list">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>[Icon]</th>
+            <th>[Priority]</th>
+            <th>[Reporter]</th>
+            <th>[Subject]</th>
+            <th>[PhishML]</th>
+            <th>[Status]</th>
+            <th>[Date]</th>
+          </tr>
+        </thead>
+        <tbody id="incident-rows"></tbody>
+      </table>
     </section>
 
-    <aside class="pane pane-right" aria-label="Action and disposition pane">
-      <div class="pane-title">Actions</div>
-      <div id="action-sidebar"></div>
+    <aside class="pane pane-right" aria-label="Triage sidebar">
+      <div id="triage-pane"></div>
     </aside>
   </main>
 
-  <div id="phishrip-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="PhishRIP processing dialog">
+  <div id="phishrip-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="PhishRIP simulation">
     <div class="modal-card">
-      <h3>PhishRIP Search and Destroy</h3>
-      <p id="phishrip-status">Searching organization mailboxes...</p>
-      <div class="progress">
-        <div id="phishrip-progress" class="progress-bar"></div>
-      </div>
-      <button id="close-modal" aria-label="Close PhishRIP result dialog">Close</button>
+      <h3>PhishRIP Simulation</h3>
+      <p id="phishrip-text">Scanning 5,000 mailboxes...</p>
+      <div class="progress"><div id="phishrip-bar" class="bar"></div></div>
+      <button id="close-modal" aria-label="Close PhishRIP modal">Close</button>
     </div>
   </div>
 

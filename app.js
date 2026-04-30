@@ -1,31 +1,38 @@
-const STORAGE_KEY = "phisher-realism-v3";
-const STATUS_FLOW = { received: ["in_review"], in_review: ["resolved"], resolved: [] };
-const tabs = ["message", "headers", "raw", "attachments", "discussion"];
+const STORE = "phisher-enterprise-v4";
+const SHIFT_SECONDS = 30 * 60;
+const TABS = ["preview", "headers", "auth", "links", "attachments"];
 
-let state = loadState();
-let selectedId = state.incidents[0]?.id || null;
+let state = load();
+let selected = state.incidents[0]?.id || null;
+let answerKey = false;
+let shiftTimer = null;
 
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { incidents: buildScenarioEngine(60), filters: defaultFilters(), query: "" };
+function load() {
+  const raw = localStorage.getItem(STORE);
+  if (!raw) {
+    return {
+      incidents: generateIncidents(55),
+      filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" },
+      shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000
+    };
+  }
   try {
     const parsed = JSON.parse(raw);
-    parsed.filters = parsed.filters || defaultFilters();
-    parsed.query = parsed.query || "";
     parsed.incidents = (parsed.incidents || []).map(normalizeIncident);
-    if (!parsed.incidents.length) parsed.incidents = buildScenarioEngine(60);
+    parsed.filters = parsed.filters || { room: "all", phishml: "all", priority: "all", status: "all", query: "" };
+    if (!parsed.shiftEndsAt) parsed.shiftEndsAt = Date.now() + SHIFT_SECONDS * 1000;
     return parsed;
   } catch {
-    return { incidents: buildScenarioEngine(60), filters: defaultFilters(), query: "" };
+    return {
+      incidents: generateIncidents(55),
+      filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" },
+      shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000
+    };
   }
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-function defaultFilters() {
-  return { phishml: "all", priority: "all", status: "all", severity: "all" };
+function save() {
+  localStorage.setItem(STORE, JSON.stringify(state));
 }
 
 function now() {
@@ -36,450 +43,393 @@ function normalizeIncident(i) {
   return {
     ...i,
     status: i.status || "received",
+    tab: i.tab || "preview",
     tags: i.tags || [],
-    discussion: i.discussion || [],
-    actions: i.actions || [],
-    selectedTab: i.selectedTab || "message"
+    noteDraft: i.noteDraft || "",
+    discussion: i.discussion || []
   };
 }
 
-function buildScenarioEngine(count) {
-  const templates = [];
-  for (let i = 0; i < count; i += 1) {
-    const type = i % 4;
-    templates.push(generateIncident(type, i + 1));
-  }
-  return templates;
+function rand(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateIncident(type, idx) {
-  const id = `INC-${String(idx).padStart(4, "0")}`;
-  if (type === 0) return buildCeoFraud(id, idx);
-  if (type === 1) return buildQuishing(id, idx);
-  if (type === 2) return buildCredentialHarvest(id, idx);
-  return buildBenign(id, idx);
-}
-
-function authStrings(idx, malicious) {
+function auth(malicious, idx) {
   if (malicious) {
     return {
-      spf: `v=spf1 include:_spf.fake-${idx}.net -all (fail)`,
-      dkim: `dkim=fail header.d=fake-${idx}.net`,
-      dmarc: `v=DMARC1; p=reject; pct=100 (fail)`
+      spf: `spf=fail smtp.mailfrom=mail-${idx}.secure-alert.net`,
+      dkim: `dkim=fail header.d=secure-alert${idx}.net`,
+      dmarc: `dmarc=fail p=reject`
     };
   }
   return {
-    spf: `v=spf1 include:_spf.academy.local -all (pass)`,
-    dkim: `dkim=pass header.d=academy.local`,
-    dmarc: `v=DMARC1; p=quarantine; pct=100 (pass)`
+    spf: "spf=pass smtp.mailfrom=academy.local",
+    dkim: "dkim=pass header.d=academy.local",
+    dmarc: "dmarc=pass p=quarantine"
   };
 }
 
-function rawHeaders(from, replyTo, auth, idx) {
+function rawHeaders(from, reply, authObj, idx) {
   return [
-    `Return-Path: <${replyTo}>`,
-    `Received: from mx${idx}.mailgw.net (mx${idx}.mailgw.net [185.31.${idx % 255}.19]) by mail.academy.local`,
-    `X-Sender-IP: 185.31.${idx % 255}.19`,
+    `Received: from edge${idx}.mail-gateway.net (185.10.${idx % 255}.31)`,
+    `Return-Path: <${reply}>`,
     `From: ${from}`,
-    `Reply-To: ${replyTo}`,
-    `Authentication-Results: ${auth.spf}; ${auth.dkim}; ${auth.dmarc}`,
-    `Message-ID: <${idx}.${Math.floor(Math.random() * 99999)}@mailgw.net>`,
+    `Reply-To: ${reply}`,
+    `X-Sender: ${reply}`,
+    `X-Originating-IP: [185.10.${idx % 255}.31]`,
+    `Authentication-Results: ${authObj.spf}; ${authObj.dkim}; ${authObj.dmarc}`,
+    `Message-ID: <${idx}.${Date.now()}@mail-gateway.net>`,
     `MIME-Version: 1.0`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `X-Originating-IP: [185.31.${idx % 255}.19]`,
-    `X-Mailer: custom-mailer-${idx}`
+    `Content-Type: text/html; charset=UTF-8`
   ].join("\n");
 }
 
-function buildCeoFraud(id, idx) {
-  const from = `CEO Office <ceo.office@academy-leadership.com>`;
-  const reply = `payments@academy-payroll-update${idx}.net`;
-  const auth = authStrings(idx, true);
-  return normalizeIncident({
+function generateIncidentByType(type, idx) {
+  const id = `PHI-${String(idx).padStart(4, "0")}`;
+  const base = {
     id,
-    category: "CEO Fraud",
-    reporter: `finance${idx % 7}@academy.local`,
-    subject: `Urgent wire approval needed #${idx}`,
-    fromDisplay: from,
-    fromAddress: "ceo.office@academy-leadership.com",
-    replyTo: reply,
-    source: "User Reported",
-    phishmlScore: 92,
-    phishmlLabel: "threat",
-    priority: "critical",
-    severity: "critical",
+    icon: "✉",
     status: "received",
-    receivedAt: now(),
-    body: "Please process this wire transfer before end of day. Keep this confidential and confirm once done.",
-    links: [`https://secure-wire-approval${idx}.net/portal`],
-    attachments: ["wire_instructions.pdf"],
-    auth,
-    domainAgeDays: 4,
-    rawHeaders: rawHeaders(from, reply, auth, idx)
-  });
-}
-
-function buildQuishing(id, idx) {
-  const from = `IT Service Desk <it-support@academy-ithelp.com>`;
-  const reply = `it-support@academy-ithelp.com`;
-  const auth = authStrings(idx, true);
-  return normalizeIncident({
-    id,
-    category: "Quishing",
-    reporter: `staff${idx % 12}@academy.local`,
-    subject: `MFA Update Required - Scan QR Code #${idx}`,
-    fromDisplay: from,
-    fromAddress: "it-support@academy-ithelp.com",
-    replyTo: reply,
-    source: "Mailflow",
-    phishmlScore: 88,
-    phishmlLabel: "threat",
-    priority: "high",
-    severity: "high",
-    status: "received",
-    receivedAt: now(),
-    body: "Your MFA token expires today. Scan the attached QR image to renew.",
-    links: [`https://mfa-renew-${idx}.security-check.net`],
-    attachments: ["mfa_qr_code.png"],
-    auth,
-    domainAgeDays: 9,
-    rawHeaders: rawHeaders(from, reply, auth, idx)
-  });
-}
-
-function buildCredentialHarvest(id, idx) {
-  const from = `Microsoft Security Team <account-security@microsoft-mail-alert${idx}.com>`;
-  const reply = `support@micr0soft-alert${idx}.net`;
-  const auth = authStrings(idx, true);
-  return normalizeIncident({
-    id,
-    category: "Credential Harvesting",
-    reporter: `user${idx % 20}@academy.local`,
-    subject: `Password Expiry Notice #${idx}`,
-    fromDisplay: from,
-    fromAddress: `account-security@microsoft-mail-alert${idx}.com`,
-    replyTo: reply,
-    source: "Defender Email",
-    phishmlScore: 95,
-    phishmlLabel: "threat",
-    priority: "high",
-    severity: "high",
-    status: "received",
-    receivedAt: now(),
-    body: "Your account password expires in 15 minutes. Validate now to prevent lockout.",
-    links: [`https://microsoft-security-login${idx}.com/session`],
-    attachments: ["security_notice.html"],
-    auth,
-    domainAgeDays: 2,
-    rawHeaders: rawHeaders(from, reply, auth, idx)
-  });
-}
-
-function buildBenign(id, idx) {
-  const from = `HR Newsletter <hr-news@academy.local>`;
+    date: now(),
+    room: "inbox",
+    tags: [],
+    discussion: [],
+    noteDraft: ""
+  };
+  if (type === "ceo_fraud") {
+    const from = "CEO Office <ceo@academy-leadership.com>";
+    const reply = `payment-ops${idx}@academy-wire-safe.net`;
+    const a = auth(true, idx);
+    return normalizeIncident({
+      ...base,
+      category: "CEO Fraud",
+      priority: "critical",
+      reporter: `finance${idx % 8}@academy.local`,
+      subject: `Confidential Wire Request ${idx}`,
+      phishml: "threat",
+      phishmlScore: rand(88, 99),
+      from,
+      replyTo: reply,
+      preview: "Urgent request from executive persona to complete same-day transfer.",
+      links: [`https://wire-portal-${idx}.net/approve`],
+      attachments: ["wire_details.pdf"],
+      auth: a,
+      raw: rawHeaders(from, reply, a, idx),
+      redFlag: "Reply-To domain does not match executive sender domain."
+    });
+  }
+  if (type === "quishing") {
+    const from = "IT Service Desk <it-support@academy-ithelp.com>";
+    const reply = `security${idx}@academy-ithelp.com`;
+    const a = auth(true, idx);
+    return normalizeIncident({
+      ...base,
+      category: "Quishing",
+      priority: "high",
+      reporter: `user${idx % 20}@academy.local`,
+      subject: `MFA Re-Enrollment Required (QR) ${idx}`,
+      phishml: "threat",
+      phishmlScore: rand(75, 96),
+      from,
+      replyTo: reply,
+      preview: "Scan attached QR code to avoid account lock.",
+      links: [`https://mfa-qr-renew-${idx}.security-check.net`],
+      attachments: ["mfa_update_qr.png"],
+      auth: a,
+      raw: rawHeaders(from, reply, a, idx),
+      redFlag: "QR lure + failing DKIM/DMARC indicates phishing infrastructure."
+    });
+  }
+  if (type === "mfa_fatigue") {
+    const from = `Identity Alerts <no-reply@id-prompt${idx}.com>`;
+    const reply = `helpdesk@id-prompt${idx}.com`;
+    const a = auth(true, idx);
+    return normalizeIncident({
+      ...base,
+      category: "MFA Fatigue",
+      priority: "high",
+      reporter: `employee${idx % 17}@academy.local`,
+      subject: `Repeated MFA Prompt Alert ${idx}`,
+      phishml: "spam",
+      phishmlScore: rand(55, 79),
+      from,
+      replyTo: reply,
+      preview: "Unexpected multiple MFA prompts with urgent 'approve now' language.",
+      links: [`https://identity-approve-${idx}.secure-now.net`],
+      attachments: [],
+      auth: a,
+      raw: rawHeaders(from, reply, a, idx),
+      redFlag: "Unexpected MFA approval lure from non-corporate sender domain."
+    });
+  }
+  if (type === "password_reset") {
+    const from = `IT Password Reset <password-reset${idx}@academy-support-help.com>`;
+    const reply = `reset@academy-support-help.com`;
+    const a = auth(true, idx);
+    return normalizeIncident({
+      ...base,
+      category: "IT Password Reset",
+      priority: "medium",
+      reporter: `staff${idx % 22}@academy.local`,
+      subject: `Password Reset Confirmation ${idx}`,
+      phishml: "spam",
+      phishmlScore: rand(45, 74),
+      from,
+      replyTo: reply,
+      preview: "Reset link expires in 5 minutes. Immediate action required.",
+      links: [`https://password-reset-${idx}.helpdesk-auth.net`],
+      attachments: ["reset_notice.html"],
+      auth: a,
+      raw: rawHeaders(from, reply, a, idx),
+      redFlag: "Lookalike support domain and auth failures."
+    });
+  }
+  const from = "HR Newsletter <hr-news@academy.local>";
   const reply = "hr-news@academy.local";
-  const auth = authStrings(idx, false);
+  const a = auth(false, idx);
   return normalizeIncident({
-    id,
-    category: "Benign False Positive",
-    reporter: `employee${idx % 25}@academy.local`,
-    subject: `Monthly HR Newsletter ${idx}`,
-    fromDisplay: from,
-    fromAddress: "hr-news@academy.local",
-    replyTo: reply,
-    source: "User Reported",
-    phishmlScore: 12,
-    phishmlLabel: "clean",
+    ...base,
+    category: "Clean Newsletter",
     priority: "low",
-    severity: "low",
-    status: "received",
-    receivedAt: now(),
-    body: "This month highlights policy updates, wellness events, and upcoming training.",
+    reporter: `member${idx % 16}@academy.local`,
+    subject: `HR Monthly Newsletter ${idx}`,
+    phishml: "clean",
+    phishmlScore: rand(5, 30),
+    from,
+    replyTo: reply,
+    preview: "Internal HR updates and employee engagement announcements.",
     links: [`https://intranet.academy.local/hr/news/${idx}`],
-    attachments: ["hr-newsletter.pdf"],
-    auth,
-    domainAgeDays: 4200,
-    rawHeaders: rawHeaders(from, reply, auth, idx)
+    attachments: ["hr_newsletter.pdf"],
+    auth: a,
+    raw: rawHeaders(from, reply, a, idx),
+    redFlag: "No significant red flag. Legitimate internal communication."
   });
 }
 
-function mismatch(i) {
-  const fromDomain = i.fromAddress.split("@")[1] || "";
-  const replyDomain = i.replyTo.split("@")[1] || "";
-  return fromDomain && replyDomain && fromDomain.toLowerCase() !== replyDomain.toLowerCase();
+function generateIncidents(total) {
+  const kinds = ["ceo_fraud", "quishing", "mfa_fatigue", "password_reset", "clean"];
+  const out = [];
+  for (let i = 1; i <= total; i += 1) {
+    out.push(generateIncidentByType(kinds[(i - 1) % kinds.length], i));
+  }
+  return out;
 }
 
-function confidenceColor(score) {
-  if (score >= 70) return "var(--threat)";
-  if (score >= 40) return "var(--spam)";
-  return "var(--clean)";
+function pmlClass(v) {
+  if (v === "threat") return "pml-threat";
+  if (v === "spam") return "pml-spam";
+  return "pml-clean";
 }
 
 function confidenceText(score) {
-  if (score >= 70) return "High Threat Likelihood";
-  if (score >= 40) return "Suspicious / Needs Review";
-  return "Likely Clean";
+  if (score >= 75) return "High";
+  if (score >= 45) return "Medium";
+  return "Low";
 }
 
-function phishmlBadge(label) {
-  if (label === "threat") return "badge-threat";
-  if (label === "spam") return "badge-spam";
-  return "badge-clean";
+function confidenceColor(score) {
+  if (score >= 75) return "var(--threat)";
+  if (score >= 45) return "var(--spam)";
+  return "var(--clean)";
 }
 
-function filteredIncidents() {
+function isLocked() {
+  return Date.now() >= state.shiftEndsAt;
+}
+
+function filtered() {
   return state.incidents.filter((i) => {
     const f = state.filters;
-    const q = state.query.toLowerCase();
-    const matchQuery = !q || `${i.reporter} ${i.subject} ${i.fromAddress} ${i.replyTo}`.toLowerCase().includes(q);
-    return (f.phishml === "all" || i.phishmlLabel === f.phishml) &&
-      (f.priority === "all" || i.priority === f.priority) &&
-      (f.status === "all" || i.status === f.status) &&
-      (f.severity === "all" || i.severity === f.severity) &&
-      matchQuery;
+    if (f.room !== "all") {
+      if (f.room === "critical" && i.priority !== "critical") return false;
+      if (f.room === "review" && i.status !== "in_review") return false;
+      if (f.room === "resolved" && i.status !== "resolved") return false;
+      if (f.room === "inbox" && i.room !== "inbox") return false;
+    }
+    if (f.phishml !== "all" && i.phishml !== f.phishml) return false;
+    if (f.priority !== "all" && i.priority !== f.priority) return false;
+    if (f.status !== "all" && i.status !== f.status) return false;
+    if (f.query) {
+      const hay = `${i.reporter} ${i.subject} ${i.from} ${i.replyTo}`.toLowerCase();
+      if (!hay.includes(f.query.toLowerCase())) return false;
+    }
+    return true;
   });
 }
 
-function appendAudit(i, text, icon, actor = "system") {
-  const entry = { ts: now(), icon, actor, text };
-  i.discussion.push(entry);
-  i.actions.push(entry);
+function appendLog(i, icon, text, actor = "system") {
+  i.discussion.push({ ts: now(), icon, text, actor });
 }
 
-function renderInbox() {
-  const target = document.getElementById("inbox-list");
-  const incidents = filteredIncidents();
-  target.innerHTML = incidents.map((i) => `
-    <article class="inbox-row ${i.id === selectedId ? "active" : ""}" data-id="${i.id}" role="listitem" aria-label="Incident ${i.subject}">
-      <div class="meta">${i.reporter}</div>
-      <div><strong>${i.subject}</strong></div>
-      <div class="meta">${i.fromAddress}</div>
-      <div>
-        <span class="badge ${phishmlBadge(i.phishmlLabel)}">${i.phishmlLabel.toUpperCase()}</span>
-        <span class="badge">${i.priority.toUpperCase()}</span>
-        <span class="badge">${i.status.replaceAll("_", " ").toUpperCase()}</span>
-      </div>
-    </article>
+function renderRows() {
+  const tbody = document.getElementById("incident-rows");
+  tbody.innerHTML = filtered().map((i) => `
+    <tr class="incident-row ${i.id === selected ? "active" : ""}" data-id="${i.id}">
+      <td>${i.icon}</td>
+      <td>${i.priority.toUpperCase()}</td>
+      <td>${i.reporter}</td>
+      <td>${i.subject}</td>
+      <td><span class="pml ${pmlClass(i.phishml)}">PML:${i.phishml.toUpperCase()}</span></td>
+      <td>${i.status.replaceAll("_", " ").toUpperCase()}</td>
+      <td>${i.date}</td>
+    </tr>
   `).join("");
-  target.querySelectorAll(".inbox-row").forEach((row) => row.addEventListener("click", () => {
-    selectedId = row.dataset.id;
+  tbody.querySelectorAll(".incident-row").forEach((r) => r.addEventListener("click", () => {
+    if (isLocked()) return;
+    selected = r.dataset.id;
     renderAll();
   }));
 }
 
-function tabButton(tab, active) {
-  return `<button class="tab-btn ${active ? "active" : ""}" data-tab="${tab}" aria-label="Open ${tab} tab">${tab[0].toUpperCase() + tab.slice(1)}</button>`;
-}
-
-function renderMessagePane() {
-  const target = document.getElementById("message-view");
-  const i = state.incidents.find((x) => x.id === selectedId);
+function renderTriage() {
+  const pane = document.getElementById("triage-pane");
+  const i = state.incidents.find((x) => x.id === selected);
   if (!i) {
-    target.innerHTML = '<div class="message"><h3>No message selected</h3></div>';
+    pane.innerHTML = "<p>No incident selected.</p>";
     return;
   }
-  const barColor = confidenceColor(i.phishmlScore);
-  const activeTab = i.selectedTab || "message";
-  const rawPanel = `<pre class="mono">${i.rawHeaders}\n\nX-Sender: ${i.fromAddress}\nReturn-Path: ${i.replyTo}\nReceived: by edge.mail.academy.local\nReceived: from relay${i.id}.mailgw.net</pre>`;
-  target.innerHTML = `
-    <div class="message">
-      <h2>${i.subject}</h2>
-      <p class="meta">From: ${i.fromDisplay} | Reply-To: ${i.replyTo} | Received: ${i.receivedAt}</p>
-      <div class="confidence-wrap">
-        <div class="confidence-label">
-          <span>PhishML Confidence: ${i.phishmlScore}%</span>
-          <span>${confidenceText(i.phishmlScore)}</span>
-        </div>
-        <div class="confidence-bar" style="width:${i.phishmlScore}%; background:${barColor};"></div>
+  const tab = i.tab || "preview";
+  const locked = isLocked();
+  const mismatch = i.from.split("@")[1]?.replace(">", "") !== i.replyTo.split("@")[1];
+  pane.innerHTML = `
+    <div class="confidence">
+      <div class="confidence-head">
+        <span>PhishML ${i.phishmlScore}%</span>
+        <span>${confidenceText(i.phishmlScore)} Likelihood</span>
       </div>
-      <div class="tabs">${tabs.map((t) => tabButton(t, t === activeTab)).join("")}</div>
-      <section class="tab-panel ${activeTab === "message" ? "active" : ""}" id="panel-message">
-        <p>${i.body}</p>
-        <p><strong>URL(s):</strong><br>${i.links.map((l) => `<span class="mono">${l}</span>`).join("<br>")}</p>
-      </section>
-      <section class="tab-panel ${activeTab === "headers" ? "active" : ""}" id="panel-headers">
-        <p><strong>From Address:</strong> ${i.fromAddress}</p>
-        <p><strong>Reply-To:</strong> ${i.replyTo}</p>
-        <p><strong>SPF:</strong> ${i.auth.spf}<br><strong>DKIM:</strong> ${i.auth.dkim}<br><strong>DMARC:</strong> ${i.auth.dmarc}</p>
-        ${mismatch(i) ? `<div class="warn">Mismatch detected between From and Reply-To domain.</div>` : `<div class="ok">From and Reply-To are aligned.</div>`}
-      </section>
-      <section class="tab-panel ${activeTab === "raw" ? "active" : ""}" id="panel-raw">${rawPanel}</section>
-      <section class="tab-panel ${activeTab === "attachments" ? "active" : ""}" id="panel-attachments">
-        <ul>${i.attachments.map((a) => `<li>${a}</li>`).join("")}</ul>
-        <p class="meta">Domain age: ${i.domainAgeDays} days</p>
-      </section>
-      <section class="tab-panel ${activeTab === "discussion" ? "active" : ""}" id="panel-discussion">
-        <div class="log">${i.discussion.map((d) => `<div class="log-item">${d.icon} ${d.ts} - ${d.text} (${d.actor})</div>`).join("") || "No discussion yet."}</div>
-      </section>
+      <div class="confidence-bar" style="width:${i.phishmlScore}%; background:${confidenceColor(i.phishmlScore)};"></div>
     </div>
+    <h3>${i.subject}</h3>
+    <p class="muted">From: ${i.from}<br>Reply-To: ${i.replyTo}</p>
+    <div class="tabs">
+      ${TABS.map((t) => `<button class="tab ${t === tab ? "active" : ""}" data-tab="${t}" aria-label="Open ${t} tab">${t.toUpperCase()}</button>`).join("")}
+    </div>
+    <div class="tab-panel">
+      ${tab === "preview" ? `<p>${i.preview}</p>${answerKey ? `<p class="${mismatch ? "warn" : "ok"}">Red Flag: ${i.redFlag}</p>` : ""}` : ""}
+      ${tab === "headers" ? `<p><strong>From:</strong> ${i.from}<br><strong>Reply-To:</strong> ${i.replyTo}</p><p class="${mismatch ? "warn" : "ok"}">${mismatch ? "From/Reply-To mismatch detected." : "No mismatch detected."}</p>` : ""}
+      ${tab === "auth" ? `<p>SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}</p>` : ""}
+      ${tab === "links" ? `<ul>${i.links.map((l) => `<li class="mono">${l}</li>`).join("")}</ul>` : ""}
+      ${tab === "attachments" ? `<ul>${i.attachments.map((a) => `<li>${a}</li>`).join("")}</ul><pre class="mono">${i.raw}</pre>` : ""}
+    </div>
+    <div class="actions">
+      <button id="assign-btn" aria-label="Assign incident">Assign</button>
+      <button id="review-btn" aria-label="Set in review">In Review</button>
+      <button id="resolve-btn" aria-label="Resolve incident">Resolve</button>
+      <button id="tag-btn" aria-label="Add threat tag">Add Tag</button>
+      <button id="phishrip-btn" aria-label="Run PhishRIP simulation" ${i.phishml !== "threat" ? "disabled" : ""}>Run PhishRIP</button>
+      <button id="block-btn" aria-label="Block sender domain">Block</button>
+    </div>
+    <label>Analyst Notes (Auto-save)
+      <textarea id="analyst-notes" aria-label="Analyst notes area" rows="5" ${locked ? "disabled" : ""}>${i.noteDraft || ""}</textarea>
+    </label>
+    <div class="log">${i.discussion.slice().reverse().map((d) => `<div>${d.icon} ${d.ts} - ${d.text}</div>`).join("") || "No logs yet."}</div>
   `;
-  target.querySelectorAll(".tab-btn").forEach((btn) => btn.addEventListener("click", () => {
-    i.selectedTab = btn.dataset.tab;
-    saveState();
-    renderMessagePane();
+
+  pane.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
+    i.tab = b.dataset.tab;
+    save();
+    renderTriage();
   }));
-}
-
-function allowedTransitions(status) {
-  return STATUS_FLOW[status] || [];
-}
-
-function renderActionPane() {
-  const target = document.getElementById("action-sidebar");
-  const i = state.incidents.find((x) => x.id === selectedId);
-  if (!i) {
-    target.innerHTML = '<div class="sidebar">No incident selected.</div>';
-    return;
-  }
-  const transitions = allowedTransitions(i.status);
-  target.innerHTML = `
-    <div class="sidebar">
-      <label>Status
-        <select id="status-select" aria-label="Change incident status">
-          <option value="${i.status}">${i.status.replaceAll("_", " ").toUpperCase()}</option>
-          ${transitions.map((s) => `<option value="${s}">${s.replaceAll("_", " ").toUpperCase()}</option>`).join("")}
-        </select>
-      </label>
-      <label>Disposition
-        <select id="disposition-select" aria-label="Set incident disposition">
-          <option value="unknown">Unknown</option>
-          <option value="threat">Threat</option>
-          <option value="spam">Spam</option>
-          <option value="clean">Clean</option>
-        </select>
-      </label>
-      <label>Tag
-        <input id="tag-input" aria-label="Add tag input" placeholder="Credential Harvesting" />
-      </label>
-      <button id="add-tag" aria-label="Add incident tag">Add Tag</button>
-      <div class="meta">Tags: ${i.tags.join(", ") || "None"}</div>
-
-      <div class="action-grid">
-        <button id="assign-btn" aria-label="Assign incident to analyst">Assign to Me</button>
-        <button id="phishrip-btn" aria-label="Run PhishRIP action">Run PhishRIP</button>
-        <button id="blocklist-btn" aria-label="Block sender domain">Blocklist Domain</button>
-        <button id="phishflip-btn" aria-label="Convert to PhishFlip template">PhishFlip</button>
-      </div>
-
-      <label>Analyst Note
-        <textarea id="note-input" aria-label="Add analyst note" rows="5" placeholder="Document analysis and remediation."></textarea>
-      </label>
-      <button id="post-note" aria-label="Post note to discussion">Post Note</button>
-
-      <div class="log">${i.actions.slice().reverse().slice(0, 12).map((a) => `<div class="log-item">${a.icon} ${a.ts} - ${a.text}</div>`).join("") || "No audit actions yet."}</div>
-    </div>
-  `;
-
-  document.getElementById("status-select").value = i.status;
-  document.getElementById("disposition-select").value = i.disposition || "unknown";
-
-  document.getElementById("status-select").addEventListener("change", (e) => {
-    const next = e.target.value;
-    if (next !== i.status && allowedTransitions(i.status).includes(next)) {
-      i.status = next;
-      appendAudit(i, `Status changed to ${next.replaceAll("_", " ")}`, "🛠", "analyst");
-      saveState();
-      renderAll();
+  pane.querySelector("#assign-btn").addEventListener("click", () => clickAction(i, "👤", "Assigned to analyst."));
+  pane.querySelector("#review-btn").addEventListener("click", () => {
+    if (i.status === "received") {
+      i.status = "in_review";
+      clickAction(i, "🛠", "Status changed to In Review.");
     }
   });
-  document.getElementById("disposition-select").addEventListener("change", (e) => {
-    i.disposition = e.target.value;
-    appendAudit(i, `Disposition set to ${i.disposition}`, "🏷", "analyst");
-    saveState();
-    renderAll();
+  pane.querySelector("#resolve-btn").addEventListener("click", () => {
+    if (i.status === "in_review") {
+      i.status = "resolved";
+      clickAction(i, "✅", "Status changed to Resolved.");
+    }
   });
-  document.getElementById("add-tag").addEventListener("click", () => {
-    const val = document.getElementById("tag-input").value.trim();
-    if (!val) return;
-    if (!i.tags.includes(val)) i.tags.push(val);
-    appendAudit(i, `Tag added: ${val}`, "🏷", "analyst");
-    saveState();
-    renderAll();
+  pane.querySelector("#tag-btn").addEventListener("click", () => {
+    if (!i.tags.includes("Needs Investigation")) i.tags.push("Needs Investigation");
+    clickAction(i, "🏷", "Tag added: Needs Investigation.");
   });
-  document.getElementById("assign-btn").addEventListener("click", () => {
-    i.assignee = "Current Analyst";
-    appendAudit(i, "Case assigned to Current Analyst", "👤", "system");
-    saveState();
-    renderAll();
+  pane.querySelector("#block-btn").addEventListener("click", () => clickAction(i, "⛔", "Sender domain blocked."));
+  pane.querySelector("#phishrip-btn").addEventListener("click", () => runPhishRip(i));
+  const notes = pane.querySelector("#analyst-notes");
+  notes.addEventListener("input", () => {
+    i.noteDraft = notes.value;
+    save();
   });
-  document.getElementById("blocklist-btn").addEventListener("click", () => {
-    const domain = i.replyTo.split("@")[1] || "unknown";
-    appendAudit(i, `Domain blocklist applied for ${domain}`, "⛔", "system");
-    saveState();
-    renderAll();
-  });
-  document.getElementById("phishflip-btn").addEventListener("click", () => {
-    appendAudit(i, "PhishFlip template generated from incident", "🔁", "system");
-    saveState();
-    renderAll();
-  });
-  document.getElementById("post-note").addEventListener("click", () => {
-    const note = document.getElementById("note-input").value.trim();
-    if (!note) return;
-    appendAudit(i, note, "🗒", "analyst");
-    saveState();
-    renderAll();
-  });
-  document.getElementById("phishrip-btn").addEventListener("click", () => runPhishRip(i));
+}
+
+function clickAction(i, icon, text) {
+  if (isLocked()) return;
+  appendLog(i, icon, text, "analyst");
+  save();
+  renderAll();
 }
 
 function runPhishRip(i) {
+  if (isLocked()) return;
   const modal = document.getElementById("phishrip-modal");
-  const statusText = document.getElementById("phishrip-status");
-  const bar = document.getElementById("phishrip-progress");
+  const bar = document.getElementById("phishrip-bar");
+  const txt = document.getElementById("phishrip-text");
   modal.classList.remove("hidden");
-  let progress = 0;
+  let pct = 0;
   bar.style.width = "0%";
-  statusText.textContent = "Searching organization mailboxes...";
+  txt.textContent = "Scanning 5,000 mailboxes...";
   const timer = setInterval(() => {
-    progress += 12;
-    bar.style.width = `${Math.min(progress, 100)}%`;
-    if (progress >= 100) {
+    pct += 10;
+    bar.style.width = `${pct}%`;
+    if (pct >= 100) {
       clearInterval(timer);
-      const found = Math.floor(Math.random() * 18) + 3;
-      const removed = Math.max(1, found - Math.floor(Math.random() * 4));
-      statusText.textContent = `Search complete. ${found} matching messages found, ${removed} deleted/quarantined.`;
-      appendAudit(i, `PhishRIP executed: ${found} found / ${removed} removed`, "🧹", "system");
-      saveState();
-      renderActionPane();
-      renderMessagePane();
+      const ripped = rand(3, 48);
+      txt.textContent = `Scan complete. ${ripped} identical threats ripped (quarantined).`;
+      appendLog(i, "🧹", `PhishRIP completed. ${ripped} threats quarantined.`, "system");
+      save();
+      renderTriage();
     }
-  }, 220);
+  }, 180);
 }
 
-function bindControls() {
-  document.getElementById("global-search").addEventListener("input", (e) => {
-    state.query = e.target.value;
-    saveState();
-    renderInbox();
-  });
-  document.getElementById("reset-data").addEventListener("click", () => {
-    state = { incidents: buildScenarioEngine(60), filters: defaultFilters(), query: "" };
-    selectedId = state.incidents[0]?.id || null;
-    saveState();
+function updateTimer() {
+  const el = document.getElementById("shift-timer");
+  const left = Math.max(0, Math.floor((state.shiftEndsAt - Date.now()) / 1000));
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  el.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (left === 0) {
+    clearInterval(shiftTimer);
+    el.textContent = "SHIFT LOCKED";
+  }
+}
+
+function bind() {
+  document.getElementById("room-filter").addEventListener("change", (e) => { state.filters.room = e.target.value; save(); renderRows(); });
+  document.getElementById("phishml-filter").addEventListener("change", (e) => { state.filters.phishml = e.target.value; save(); renderRows(); });
+  document.getElementById("priority-filter").addEventListener("change", (e) => { state.filters.priority = e.target.value; save(); renderRows(); });
+  document.getElementById("status-filter").addEventListener("change", (e) => { state.filters.status = e.target.value; save(); renderRows(); });
+  document.getElementById("search-filter").addEventListener("input", (e) => { state.filters.query = e.target.value; save(); renderRows(); });
+  document.getElementById("answer-key-toggle").addEventListener("click", () => { answerKey = !answerKey; renderTriage(); });
+  document.getElementById("reset-sim").addEventListener("click", () => {
+    state = { incidents: generateIncidents(55), filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" }, shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000 };
+    selected = state.incidents[0]?.id || null;
+    answerKey = false;
+    save();
     renderAll();
   });
-  document.getElementById("filter-phishml").addEventListener("change", (e) => { state.filters.phishml = e.target.value; saveState(); renderInbox(); });
-  document.getElementById("filter-priority").addEventListener("change", (e) => { state.filters.priority = e.target.value; saveState(); renderInbox(); });
-  document.getElementById("filter-status").addEventListener("change", (e) => { state.filters.status = e.target.value; saveState(); renderInbox(); });
-  document.getElementById("filter-severity").addEventListener("change", (e) => { state.filters.severity = e.target.value; saveState(); renderInbox(); });
   document.getElementById("close-modal").addEventListener("click", () => document.getElementById("phishrip-modal").classList.add("hidden"));
 }
 
-function hydrateControls() {
-  document.getElementById("global-search").value = state.query || "";
-  document.getElementById("filter-phishml").value = state.filters.phishml;
-  document.getElementById("filter-priority").value = state.filters.priority;
-  document.getElementById("filter-status").value = state.filters.status;
-  document.getElementById("filter-severity").value = state.filters.severity;
+function hydrate() {
+  document.getElementById("room-filter").value = state.filters.room;
+  document.getElementById("phishml-filter").value = state.filters.phishml;
+  document.getElementById("priority-filter").value = state.filters.priority;
+  document.getElementById("status-filter").value = state.filters.status;
+  document.getElementById("search-filter").value = state.filters.query;
 }
 
 function renderAll() {
-  hydrateControls();
-  renderInbox();
-  renderMessagePane();
-  renderActionPane();
+  hydrate();
+  renderRows();
+  renderTriage();
+  updateTimer();
 }
 
-bindControls();
+bind();
 renderAll();
+shiftTimer = setInterval(updateTimer, 1000);
