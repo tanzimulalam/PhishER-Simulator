@@ -1,4 +1,4 @@
-const STORE = "phisher-enterprise-v6";
+const STORE = "phisher-enterprise-v7";
 const SHIFT_SECONDS = 30 * 60;
 const TABS = ["preview", "headers", "auth", "links", "attachments"];
 const THREAT_DOMAINS = [
@@ -39,6 +39,9 @@ function load() {
     parsed.incidents = (parsed.incidents || []).map(normalizeIncident);
     parsed.filters = parsed.filters || { room: "all", phishml: "all", priority: "all", status: "all", query: "" };
     parsed.shiftEndsAt = parsed.shiftEndsAt || (Date.now() + SHIFT_SECONDS * 1000);
+    parsed.currentView = parsed.currentView || "inbox";
+    parsed.highContrast = Boolean(parsed.highContrast);
+    parsed.finalFiveInjected = Boolean(parsed.finalFiveInjected);
     return parsed;
   } catch {
     return freshState();
@@ -49,11 +52,15 @@ function freshState() {
   return {
     incidents: generateIncidents(55).concat(generateQuishingIncidents(10)),
     filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" },
-    shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000
+    shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000,
+    currentView: "inbox",
+    highContrast: false,
+    finalFiveInjected: false
   };
 }
 
 function save() {
+  state.currentView = currentView;
   localStorage.setItem(STORE, JSON.stringify(state));
 }
 
@@ -299,6 +306,23 @@ function generateQuishingIncidents(total) {
       qrData: url,
       extractedQrUrl: ""
     }));
+  }
+  return out;
+}
+
+function generateSurgeIncidents(total) {
+  const out = [];
+  for (let i = 0; i < total; i += 1) {
+    const idx = 12000 + rand(1, 999);
+    const reporter = pickReporter(idx, "high");
+    const type = ["ceo_fraud", "mfa_fatigue", "password_reset"][rand(0, 2)];
+    const incident = generateIncidentByType(type, idx);
+    incident.reporter = reporter;
+    incident.reporterProfile = reporter;
+    incident.priority = ["critical", "high"][rand(0, 1)];
+    incident.date = `${now()} (SURGE)`;
+    incident.subject = `[Final 5] ${incident.subject}`;
+    out.push(incident);
   }
   return out;
 }
@@ -653,8 +677,11 @@ function renderAnalytics() {
   const clean = all.filter((i) => i.phishml === "clean").length;
   const correct = all.filter((i) => i.phishml === i.expectedDisposition).length;
   const incorrect = all.length - correct;
+  const neutralized = all.reduce((sum, i) => sum + i.discussion.filter((d) => d.icon === "🧹" || d.icon === "⚡").length, 0);
+  const accuracyPct = all.length ? Math.round((correct / all.length) * 100) : 0;
 
   host.innerHTML = `
+    <p><strong>Overall Accuracy:</strong> ${accuracyPct}% | <strong>Threats Neutralized:</strong> ${neutralized}</p>
     <div class="dash-grid">
       <article class="dash-card">
         <h3>Incident Status</h3>
@@ -688,6 +715,7 @@ function switchView(view) {
   inboxBtn.classList.toggle("active", showInbox);
   dashBtn.classList.toggle("active", !showInbox);
   if (!showInbox) renderAnalytics();
+  save();
 }
 
 function updateTimer() {
@@ -696,6 +724,15 @@ function updateTimer() {
   const m = Math.floor(left / 60);
   const s = left % 60;
   el.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  el.classList.toggle("pulse", left > 0 && left < 300);
+  if (left < 300 && !state.finalFiveInjected) {
+    const surge = generateSurgeIncidents(rand(3, 5));
+    state.incidents = surge.concat(state.incidents);
+    state.finalFiveInjected = true;
+    save();
+    renderRows();
+    renderAnalytics();
+  }
   if (left === 0) {
     clearInterval(shiftTimer);
     el.textContent = "SHIFT LOCKED";
@@ -711,13 +748,21 @@ function bind() {
   document.getElementById("answer-key-toggle").addEventListener("click", () => { answerKey = !answerKey; renderTriage(); });
   document.getElementById("view-inbox").addEventListener("click", () => switchView("inbox"));
   document.getElementById("view-dashboard").addEventListener("click", () => switchView("dashboard"));
+  document.getElementById("contrast-toggle").addEventListener("click", () => {
+    state.highContrast = !state.highContrast;
+    document.body.classList.toggle("high-contrast", state.highContrast);
+    save();
+  });
   document.getElementById("reset-sim").addEventListener("click", () => {
+    localStorage.removeItem(STORE);
     state = freshState();
     selected = state.incidents[0]?.id || null;
     answerKey = false;
+    currentView = "inbox";
     save();
     renderAll();
   });
+  document.getElementById("download-report").addEventListener("click", () => downloadShiftReport());
   document.getElementById("close-modal").addEventListener("click", () => document.getElementById("phishrip-modal").classList.add("hidden"));
   document.getElementById("close-detonate-modal").addEventListener("click", () => document.getElementById("detonate-modal").classList.add("hidden"));
   document.addEventListener("keydown", (e) => {
@@ -743,9 +788,41 @@ function renderAll() {
   renderTriage();
   renderAnalytics();
   switchView(currentView);
+  document.body.classList.toggle("high-contrast", state.highContrast);
   updateTimer();
 }
 
+function downloadShiftReport() {
+  const all = state.incidents;
+  const threatIncidents = all.filter((i) => i.phishml === "threat");
+  const correct = all.filter((i) => i.phishml === i.expectedDisposition).length;
+  const accuracyPct = all.length ? Math.round((correct / all.length) * 100) : 0;
+  const neutralized = all.reduce((sum, i) => sum + i.discussion.filter((d) => d.icon === "🧹" || d.icon === "⚡").length, 0);
+  const lines = [
+    "KnowBe4 PhishER Simulator - Shift Report",
+    `Generated: ${now()}`,
+    "",
+    `Overall Accuracy Score: ${accuracyPct}% (${correct}/${all.length})`,
+    `Total Threats Neutralized (PhishRIP/ZAP): ${neutralized}`,
+    "",
+    "Threat Incident Submission:"
+  ];
+  threatIncidents.forEach((i) => {
+    lines.push(`- ${i.id} | ${i.subject}`);
+    lines.push(`  Analyst Notes: ${i.noteDraft?.trim() || "No notes submitted."}`);
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `shift-report-${Date.now()}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+currentView = state.currentView || "inbox";
 bind();
 renderAll();
 shiftTimer = setInterval(updateTimer, 1000);
