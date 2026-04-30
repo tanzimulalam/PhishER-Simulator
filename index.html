@@ -19,6 +19,13 @@
             <option value="instructor">Instructor</option>
           </select>
         </label>
+        <label>Class Section
+          <select id="login-section">
+            <option value="Section A">Section A</option>
+            <option value="Section B">Section B</option>
+            <option value="Section C">Section C</option>
+          </select>
+        </label>
         <button class="primary" type="submit">Enter Simulator</button>
       </form>
     </div>
@@ -39,6 +46,7 @@
         <button class="nav-link active" data-view="dashboard">Dashboard</button>
         <button class="nav-link" data-view="inbox">PhishER Inbox</button>
         <button class="nav-link" data-view="scoreboard">Scoreboard</button>
+        <button class="nav-link" data-view="analytics">Analytics</button>
         <button class="nav-link" data-view="answer-key">Answer Key</button>
         <button class="nav-link" data-view="campaigns">Campaigns</button>
         <button class="nav-link" data-view="templates">Email Templates</button>
@@ -147,8 +155,16 @@
         <section id="scoreboard" class="view">
           <div class="panel">
             <h3>Student Leaderboard</h3>
+            <label>Section Filter
+              <select id="scoreboard-section-filter">
+                <option value="all">All Sections</option>
+                <option value="Section A">Section A</option>
+                <option value="Section B">Section B</option>
+                <option value="Section C">Section C</option>
+              </select>
+            </label>
             <table>
-              <thead><tr><th>Analyst</th><th>Role</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
+              <thead><tr><th>Analyst</th><th>Section</th><th>Role</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
               <tbody id="scoreboard-table"></tbody>
             </table>
           </div>
@@ -164,8 +180,25 @@
           <div class="panel">
             <h3>Attempt History</h3>
             <table>
-              <thead><tr><th>Student</th><th>Pack</th><th>Submitted At</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
+              <thead><tr><th>Student</th><th>Section</th><th>Pack</th><th>Submitted At</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
               <tbody id="attempt-history-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="analytics" class="view">
+          <div class="panel">
+            <h3>Section Performance</h3>
+            <table>
+              <thead><tr><th>Section</th><th>Students</th><th>Avg Score</th><th>Avg Accuracy</th></tr></thead>
+              <tbody id="analytics-sections-table"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h3>Mistake Trends</h3>
+            <table>
+              <thead><tr><th>Trend</th><th>Count</th></tr></thead>
+              <tbody id="analytics-trends-table"></tbody>
             </table>
           </div>
         </section>

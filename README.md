@@ -35,6 +35,8 @@ This simulator is designed for classroom use to help students practice phishing 
 - **Attempt history tracking** per student submission
 - **Instructor grade release toggle** (hide/reveal assessment grades)
 - **PDF report export** (print-ready instructor report)
+- **Multi-section support** (A/B/C) with section-specific leaderboard filtering
+- **Instructor analytics** for section performance and mistake trends
 
 ## Quick Start
 
@@ -93,6 +95,13 @@ This version adds structured classroom operations:
 2. Keep grades hidden from students until instructor releases them.
 3. Toggle grade visibility using `Release Grades` / `Hide Grades`.
 4. Export print-ready PDF report from the browser.
+
+## Phase 5 Features
+
+1. Assign students to class sections at login.
+2. Filter leaderboard and attempt history by section.
+3. Track section on all exam submissions.
+4. Analytics panel shows section averages and mistake trend counters.
 
 ## Learning Outcomes
 

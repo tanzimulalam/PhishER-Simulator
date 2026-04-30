@@ -24,6 +24,7 @@ const defaultState = {
   groups: [{ id: "GRP-1", name: "SOC Class A", users: 14 }],
   campaigns: [{ id: "CMP-9001", name: "Week 2 Drill", template: "M365 Security Alert", group: "SOC Class A", status: "Completed", results: "Sent 14 / Open 12 / Click 7 / Submit 3" }],
   scorecards: {},
+  sections: ["Section A", "Section B", "Section C"],
   exam: { active: false, startedAt: null, endsAt: null, submittedUsers: [], gradesReleased: false },
   attempts: []
 };
@@ -63,13 +64,14 @@ function scoreIncident(incident) {
   return Math.min(score, 100);
 }
 
-function upsertScorecard(name, role) {
-  if (!state.scorecards[name]) state.scorecards[name] = { role, score: 0, resolved: 0, correctVerdicts: 0, notesAdded: 0, containmentActions: 0, beginWorkCount: 0 };
+function upsertScorecard(name, role, section = "Section A") {
+  if (!state.scorecards[name]) state.scorecards[name] = { role, section, score: 0, resolved: 0, correctVerdicts: 0, notesAdded: 0, containmentActions: 0, beginWorkCount: 0 };
+  if (state.scorecards[name] && !state.scorecards[name].section) state.scorecards[name].section = section;
 }
 
 function applyPoints(action, incident) {
   if (!activeUser) return;
-  upsertScorecard(activeUser.name, activeUser.role);
+  upsertScorecard(activeUser.name, activeUser.role, activeUser.section || "Section A");
   const s = state.scorecards[activeUser.name];
   if (action === "begin") { s.score += 5; s.beginWorkCount += 1; }
   if (["quarantine", "block_domain", "zap"].includes(action)) { s.containmentActions += 1; s.score += incident.groundTruth === "phishing" ? 15 : -10; }
@@ -84,7 +86,7 @@ function setAppVisibility() {
   document.getElementById("login-screen").classList.toggle("hidden", !!activeUser);
   document.getElementById("app-root").classList.toggle("hidden", !activeUser);
   if (!activeUser) return;
-  document.getElementById("active-user-pill").textContent = `${activeUser.role.toUpperCase()}: ${activeUser.name}`;
+  document.getElementById("active-user-pill").textContent = `${activeUser.role.toUpperCase()}: ${activeUser.name} (${activeUser.section || "Section A"})`;
   document.querySelector('[data-view="answer-key"]').classList.toggle("hidden", !isInstructor());
 }
 
@@ -150,7 +152,7 @@ function renderIncidentDetail() {
     const text = panel.querySelector("#incident-note").value.trim();
     if (!text) return;
     mutateIncident(i.id, (x) => { x.notes.push({ ts: now(), text, by: activeUser.name }); return x; });
-    upsertScorecard(activeUser.name, activeUser.role);
+    upsertScorecard(activeUser.name, activeUser.role, activeUser.section || "Section A");
     state.scorecards[activeUser.name].score += 10;
     state.scorecards[activeUser.name].notesAdded += 1;
     saveState();
@@ -173,20 +175,49 @@ function runAction(id, action) {
 }
 
 function renderScoreboard() {
-  const rows = Object.entries(state.scorecards).map(([name, s]) => ({ name, role: s.role, score: s.score, resolved: s.resolved, accuracy: s.resolved ? Math.round((s.correctVerdicts / s.resolved) * 100) : 0 })).sort((a, b) => b.score - a.score);
+  const selectedSection = document.getElementById("scoreboard-section-filter").value;
+  const rows = Object.entries(state.scorecards).map(([name, s]) => ({ name, role: s.role, section: s.section || "Section A", score: s.score, resolved: s.resolved, accuracy: s.resolved ? Math.round((s.correctVerdicts / s.resolved) * 100) : 0 }))
+    .filter((r) => selectedSection === "all" || r.section === selectedSection)
+    .sort((a, b) => b.score - a.score);
   const canSeeGrades = isInstructor() || state.exam.gradesReleased;
   document.getElementById("scoreboard-table").innerHTML = rows.map((r) => {
     const scoreCell = canSeeGrades ? r.score : "Hidden";
     const accCell = canSeeGrades ? `${r.accuracy}%` : "Hidden";
-    return `<tr><td>${r.name}</td><td>${r.role}</td><td>${scoreCell}</td><td>${r.resolved}</td><td>${accCell}</td></tr>`;
-  }).join("") || "<tr><td colspan='5'>No activity yet.</td></tr>";
+    return `<tr><td>${r.name}</td><td>${r.section}</td><td>${r.role}</td><td>${scoreCell}</td><td>${r.resolved}</td><td>${accCell}</td></tr>`;
+  }).join("") || "<tr><td colspan='6'>No activity yet.</td></tr>";
 
   const attempts = state.attempts || [];
-  document.getElementById("attempt-history-table").innerHTML = attempts.map((a) => {
+  document.getElementById("attempt-history-table").innerHTML = attempts.filter((a) => selectedSection === "all" || a.section === selectedSection).map((a) => {
     const score = canSeeGrades ? a.score : "Hidden";
     const accuracy = canSeeGrades ? `${a.accuracy}%` : "Hidden";
-    return `<tr><td>${a.student}</td><td>${a.pack}</td><td>${a.submittedAt}</td><td>${score}</td><td>${a.resolved}</td><td>${accuracy}</td></tr>`;
-  }).join("") || "<tr><td colspan='6'>No submissions yet.</td></tr>";
+    return `<tr><td>${a.student}</td><td>${a.section || "Section A"}</td><td>${a.pack}</td><td>${a.submittedAt}</td><td>${score}</td><td>${a.resolved}</td><td>${accuracy}</td></tr>`;
+  }).join("") || "<tr><td colspan='7'>No submissions yet.</td></tr>";
+}
+
+function renderAnalytics() {
+  const scoreRows = Object.values(state.scorecards || {});
+  const sectionData = (state.sections || ["Section A", "Section B", "Section C"]).map((section) => {
+    const members = scoreRows.filter((s) => (s.section || "Section A") === section);
+    const avgScore = members.length ? Math.round(members.reduce((sum, s) => sum + s.score, 0) / members.length) : 0;
+    const avgAccuracy = members.length ? Math.round(members.reduce((sum, s) => sum + (s.resolved ? (s.correctVerdicts / s.resolved) * 100 : 0), 0) / members.length) : 0;
+    return { section, students: members.length, avgScore, avgAccuracy };
+  });
+  document.getElementById("analytics-sections-table").innerHTML = sectionData.map((s) => `<tr><td>${s.section}</td><td>${s.students}</td><td>${s.avgScore}</td><td>${s.avgAccuracy}%</td></tr>`).join("");
+
+  const attempts = state.attempts || [];
+  let wrongVerdictCount = 0;
+  let lowDocumentationCount = 0;
+  let overContainmentCount = 0;
+  attempts.forEach((a) => {
+    if ((a.accuracy || 0) < 70) wrongVerdictCount += 1;
+    if ((a.notesAdded || 0) < 1) lowDocumentationCount += 1;
+    if ((a.falseContainmentActions || 0) > 0) overContainmentCount += 1;
+  });
+  document.getElementById("analytics-trends-table").innerHTML = [
+    ["Low verdict accuracy submissions (<70%)", wrongVerdictCount],
+    ["Submissions with weak documentation", lowDocumentationCount],
+    ["Potential over-containment events", overContainmentCount]
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
 }
 
 function renderAnswerKey() {
@@ -292,11 +323,14 @@ function submitExamForActiveUser() {
     state.attempts = state.attempts || [];
     state.attempts.unshift({
       student: activeUser.name,
+      section: activeUser.section || "Section A",
       pack: state.activePack.toUpperCase(),
       submittedAt: now(),
       score: s.score,
       resolved: s.resolved,
-      accuracy
+      accuracy,
+      notesAdded: s.notesAdded || 0,
+      falseContainmentActions: Math.max(0, (s.containmentActions || 0) - (s.correctVerdicts || 0))
     });
   }
   saveState();
@@ -330,7 +364,8 @@ function bindInputs() {
   document.getElementById("start-exam").addEventListener("click", () => { if (!isInstructor()) return; startExam(Number(document.getElementById("exam-minutes").value || 30)); });
   document.getElementById("submit-exam").addEventListener("click", submitExamForActiveUser);
   document.getElementById("release-grades").addEventListener("click", toggleGradeRelease);
-  document.getElementById("reset-lab").addEventListener("click", () => { state = structuredClone(defaultState); if (activeUser) upsertScorecard(activeUser.name, activeUser.role); saveState(); renderAll(); });
+  document.getElementById("scoreboard-section-filter").addEventListener("change", renderScoreboard);
+  document.getElementById("reset-lab").addEventListener("click", () => { state = structuredClone(defaultState); if (activeUser) upsertScorecard(activeUser.name, activeUser.role, activeUser.section || "Section A"); saveState(); renderAll(); });
   document.getElementById("logout-btn").addEventListener("click", () => { activeUser = null; saveActiveUser(); setAppVisibility(); });
   document.getElementById("campaign-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -343,9 +378,10 @@ function bindInputs() {
     e.preventDefault();
     const name = document.getElementById("login-name").value.trim();
     const role = document.getElementById("login-role").value;
+    const section = document.getElementById("login-section").value;
     if (!name) return;
-    activeUser = { name, role };
-    upsertScorecard(name, role);
+    activeUser = { name, role, section };
+    upsertScorecard(name, role, section);
     saveState(); saveActiveUser(); setAppVisibility(); renderAll();
   });
 }
@@ -359,6 +395,7 @@ function renderAll() {
   renderIncidentTable();
   renderIncidentDetail();
   renderScoreboard();
+  renderAnalytics();
   renderAnswerKey();
   renderCampaigns();
   renderLists();
