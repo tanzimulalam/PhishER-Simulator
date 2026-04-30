@@ -290,7 +290,17 @@ function renderTriage() {
   }
   const tab = i.tab || "preview";
   const locked = isLocked();
-  const mismatch = i.from.split("@")[1]?.replace(">", "") !== i.replyTo.split("@")[1];
+  const fromDomain = i.from.split("@")[1]?.replace(">", "") || "";
+  const replyDomain = i.replyTo.split("@")[1] || "";
+  const mismatch = fromDomain !== replyDomain;
+  const headerLines = [
+    { text: `From: ${i.from}`, flag: mismatch ? "Display sender domain does not align with reply route." : "" },
+    { text: `Reply-To: ${i.replyTo}`, flag: mismatch ? "Reply-To points to different domain than From." : "" },
+    { text: `X-Sender: ${i.replyTo}`, flag: mismatch ? "X-Sender corroborates redirected reply path." : "" },
+    { text: `SPF: ${i.auth.spf}`, flag: i.auth.spf.includes("fail") ? "SPF failure indicates unauthorized sending host." : "" },
+    { text: `DKIM: ${i.auth.dkim}`, flag: i.auth.dkim.includes("fail") ? "DKIM failure suggests signing mismatch or tampering." : "" },
+    { text: `DMARC: ${i.auth.dmarc}`, flag: i.auth.dmarc.includes("fail") ? "DMARC failure indicates policy violation/spoofing risk." : "" }
+  ];
   pane.innerHTML = `
     <div class="confidence">
       <div class="confidence-head">
@@ -306,7 +316,13 @@ function renderTriage() {
     </div>
     <div class="tab-panel">
       ${tab === "preview" ? `<p>${i.preview}</p>${answerKey ? `<p class="${mismatch ? "warn" : "ok"}">Red Flag: ${i.redFlag}</p>` : ""}` : ""}
-      ${tab === "headers" ? `<p><strong>From:</strong> ${i.from}<br><strong>Reply-To:</strong> ${i.replyTo}</p><p class="${mismatch ? "warn" : "ok"}">${mismatch ? "From/Reply-To mismatch detected." : "No mismatch detected."}</p>` : ""}
+      ${tab === "headers" ? `
+        <div class="hover-hint">Hover suspicious header lines to inspect red flags.</div>
+        <div class="headers-lab">
+          ${headerLines.map((line) => `<div class="header-line ${line.flag ? "suspicious" : ""}" data-flag="${line.flag || ""}" aria-label="Header line">${line.text}</div>`).join("")}
+        </div>
+        <div id="header-flag-detail" class="${mismatch ? "warn" : "ok"}">${mismatch ? "Hover a highlighted line to view specific red-flag rationale." : "No critical mismatches detected in primary headers."}</div>
+      ` : ""}
       ${tab === "auth" ? `<p>SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}</p>` : ""}
       ${tab === "links" ? `<ul>${i.links.map((l) => `<li class="mono">${l}</li>`).join("")}</ul>` : ""}
       ${tab === "attachments" ? `<ul>${i.attachments.map((a) => `<li>${a}</li>`).join("")}</ul><pre class="mono">${i.raw}</pre>` : ""}
@@ -330,6 +346,19 @@ function renderTriage() {
     save();
     renderTriage();
   }));
+  const headerDetail = pane.querySelector("#header-flag-detail");
+  if (headerDetail) {
+    pane.querySelectorAll(".header-line.suspicious").forEach((line) => {
+      line.addEventListener("mouseenter", () => {
+        pane.querySelectorAll(".header-line").forEach((x) => x.classList.remove("active-flag"));
+        line.classList.add("active-flag");
+        headerDetail.textContent = line.dataset.flag;
+      });
+      line.addEventListener("mouseleave", () => {
+        line.classList.remove("active-flag");
+      });
+    });
+  }
   pane.querySelector("#assign-btn").addEventListener("click", () => clickAction(i, "👤", "Assigned to analyst."));
   pane.querySelector("#review-btn").addEventListener("click", () => {
     if (i.status === "received") {
