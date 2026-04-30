@@ -112,6 +112,15 @@ Inbox and investigation flow now better mirrors operational PhishER handling:
 3. Action sidebar supports assignment, tagging, status updates, PhishRIP, Blocklist, and PhishFlip simulation actions.
 4. Discussion thread and action log capture analyst decisions.
 
+## Deep Realism Pass V2
+
+1. Three-pane SOC density layout (Inbox / Message / Action Sidebar) with PhishER-style operational flow.
+2. Dynamic PhishML confidence bar with percentage and threat likelihood tiering.
+3. Scenario engine now generates 50+ incidents (current: 60) across CEO fraud, quishing, credential harvest, and benign categories.
+4. Every incident includes realistic SPF/DKIM/DMARC auth objects and massive raw-header blocks.
+5. PhishRIP workflow includes live progress modal and completion counts.
+6. Audit/discussion persistence captures every control click with icon, timestamp, and actor attribution.
+
 ## Learning Outcomes
 
 By the end of the exercise, students should be able to:

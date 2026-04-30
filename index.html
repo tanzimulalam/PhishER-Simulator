@@ -3,270 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KnowB4 Phishing Simulator</title>
+  <title>PhishER Simulator</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <section id="login-screen" class="login-screen">
-    <div class="login-card">
-      <h1>KnowB4 Phishing Simulator</h1>
-      <p>Instructor/Student training environment</p>
-      <form id="login-form">
-        <label>Name <input id="login-name" required placeholder="e.g., Fahim or Student A" /></label>
-        <label>Role
-          <select id="login-role">
-            <option value="student">Student</option>
-            <option value="instructor">Instructor</option>
-          </select>
-        </label>
-        <label>Class Section
-          <select id="login-section">
-            <option value="Section A">Section A</option>
-            <option value="Section B">Section B</option>
-            <option value="Section C">Section C</option>
-          </select>
-        </label>
-        <button class="primary" type="submit">Enter Simulator</button>
-      </form>
+  <header class="topbar">
+    <div class="brand">KnowBe4 PhishER - SOC Console</div>
+    <div class="top-actions">
+      <input id="global-search" aria-label="Search incidents globally" placeholder="Search reporter, subject, sender, domain" />
+      <button id="reset-data" aria-label="Reset simulator data">Reset Data</button>
     </div>
-  </section>
+  </header>
 
-  <div id="app-root" class="app-root hidden">
-    <div class="top-strip">
-      <div class="brand">KnowB4 Phishing Simulator</div>
-      <div class="meta">
-        <span id="active-user-pill" class="tag">Student</span>
-        <button id="logout-btn" class="soft-btn">Sign out</button>
+  <main class="three-pane" aria-label="Phishing incident triage interface">
+    <section class="pane pane-left" aria-label="Incident inbox pane">
+      <div class="pane-title">Inbox</div>
+      <div class="filters">
+        <label>PhishML
+          <select id="filter-phishml" aria-label="Filter by PhishML">
+            <option value="all">All</option>
+            <option value="threat">Threat</option>
+            <option value="spam">Spam</option>
+            <option value="clean">Clean</option>
+          </select>
+        </label>
+        <label>Priority
+          <select id="filter-priority" aria-label="Filter by priority">
+            <option value="all">All</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>Status
+          <select id="filter-status" aria-label="Filter by status">
+            <option value="all">All</option>
+            <option value="received">Received</option>
+            <option value="in_review">In Review</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </label>
       </div>
-    </div>
+      <div id="inbox-list" class="inbox-list" role="list" aria-label="Incident list"></div>
+    </section>
 
-    <div class="layout">
-      <aside class="side">
-        <div class="side-title">Navigation</div>
-        <button class="nav-link active" data-view="dashboard">Dashboard</button>
-        <button class="nav-link" data-view="inbox">PhishER Inbox</button>
-        <button class="nav-link" data-view="scoreboard">Scoreboard</button>
-        <button class="nav-link" data-view="analytics">Analytics</button>
-        <button class="nav-link" data-view="answer-key">Answer Key</button>
-        <button class="nav-link" data-view="campaigns">Campaigns</button>
-        <button class="nav-link" data-view="templates">Email Templates</button>
-        <button class="nav-link" data-view="landing-pages">Landing Pages</button>
-        <button class="nav-link" data-view="users">Users & Groups</button>
-        <button class="nav-link" data-view="playbook">IR Playbook</button>
-      </aside>
+    <section class="pane pane-center" aria-label="Message analysis pane">
+      <div id="message-view"></div>
+    </section>
 
-      <main class="content">
-        <header class="page-header">
-          <h1 id="view-title">Dashboard</h1>
-          <div class="header-actions">
-            <label>Exam (minutes)
-              <input id="exam-minutes" type="number" min="5" max="180" value="30" />
-            </label>
-            <button id="start-exam" class="soft-btn">Start Exam</button>
-            <button id="submit-exam" class="soft-btn">Submit Exam</button>
-            <button id="release-grades" class="soft-btn">Release Grades</button>
-            <span id="exam-timer" class="tag">Exam: Off</span>
-            <label>Scenario Pack
-              <select id="scenario-pack">
-                <option value="easy">Easy</option>
-                <option value="medium" selected>Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </label>
-            <button id="load-pack" class="soft-btn">Load Pack</button>
-            <button id="export-report" class="soft-btn">Export Report CSV</button>
-            <button id="export-pdf" class="soft-btn">Export Report PDF</button>
-            <button id="reset-lab" class="soft-btn">Reset Lab</button>
-          </div>
-        </header>
+    <aside class="pane pane-right" aria-label="Action and disposition pane">
+      <div class="pane-title">Actions</div>
+      <div id="action-sidebar"></div>
+    </aside>
+  </main>
 
-        <section id="dashboard" class="view active">
-          <div class="metric-grid" id="metric-cards"></div>
-          <div class="panel">
-            <h3>Instructor Brief</h3>
-            <p>Students investigate queued emails, classify phishing vs benign, execute containment, and document evidence-based decisions.</p>
-          </div>
-        </section>
-
-        <section id="answer-key" class="view">
-          <div class="panel">
-            <h3>Instructor Answer Key</h3>
-            <p>Visible to instructors only. Use for debrief and grading.</p>
-            <table>
-              <thead><tr><th>Incident</th><th>Ground Truth</th><th>Recommended Action</th><th>Reasoning</th></tr></thead>
-              <tbody id="answer-key-table"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="inbox" class="view">
-          <div class="panel filters">
-            <label>PhishML
-              <select id="filter-phishml">
-                <option value="all">All</option>
-                <option value="threat">Threat</option>
-                <option value="spam">Spam</option>
-                <option value="clean">Clean</option>
-              </select>
-            </label>
-            <label>Priority
-              <select id="filter-priority">
-                <option value="all">All</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </label>
-            <label>Status
-              <select id="filter-status">
-                <option value="all">All</option>
-                <option value="received">Received</option>
-                <option value="in_review">In Review</option>
-                <option value="resolved">Resolved</option>
-              </select>
-            </label>
-            <label>Severity
-              <select id="filter-severity">
-                <option value="all">All</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </label>
-            <label>Search
-              <input id="filter-search" placeholder="subject, sender, domain" />
-            </label>
-          </div>
-          <div class="inbox-layout">
-            <div class="panel table-panel">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Reporter</th>
-                    <th>Subject</th>
-                    <th>PhishML</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Received</th>
-                  </tr>
-                </thead>
-                <tbody id="incident-table"></tbody>
-              </table>
-            </div>
-
-            <div class="detail-stack">
-              <div class="panel" id="incident-detail"></div>
-            </div>
-          </div>
-        </section>
-
-        <section id="scoreboard" class="view">
-          <div class="panel">
-            <h3>Student Leaderboard</h3>
-            <label>Section Filter
-              <select id="scoreboard-section-filter">
-                <option value="all">All Sections</option>
-                <option value="Section A">Section A</option>
-                <option value="Section B">Section B</option>
-                <option value="Section C">Section C</option>
-              </select>
-            </label>
-            <table>
-              <thead><tr><th>Analyst</th><th>Section</th><th>Role</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
-              <tbody id="scoreboard-table"></tbody>
-            </table>
-          </div>
-          <div class="panel">
-            <h3>Grading Rubric</h3>
-            <ul>
-              <li>Correct verdict (TP/FP): 40%</li>
-              <li>Appropriate containment action: 30%</li>
-              <li>Quality documentation note present: 20%</li>
-              <li>Workflow discipline (Begin Work + Resolve): 10%</li>
-            </ul>
-          </div>
-          <div class="panel">
-            <h3>Attempt History</h3>
-            <table>
-              <thead><tr><th>Student</th><th>Section</th><th>Pack</th><th>Submitted At</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
-              <tbody id="attempt-history-table"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="analytics" class="view">
-          <div class="panel">
-            <h3>Section Performance</h3>
-            <table>
-              <thead><tr><th>Section</th><th>Students</th><th>Avg Score</th><th>Avg Accuracy</th></tr></thead>
-              <tbody id="analytics-sections-table"></tbody>
-            </table>
-          </div>
-          <div class="panel">
-            <h3>Mistake Trends</h3>
-            <table>
-              <thead><tr><th>Trend</th><th>Count</th></tr></thead>
-              <tbody id="analytics-trends-table"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="campaigns" class="view">
-          <div class="panel">
-            <h3>Campaign Builder</h3>
-            <form id="campaign-form" class="form-grid">
-              <label>Campaign Name <input id="campaign-name" required /></label>
-              <label>Email Template <select id="campaign-template"></select></label>
-              <label>Landing Page <select id="campaign-landing"></select></label>
-              <label>User Group <select id="campaign-group"></select></label>
-              <button>Create Campaign</button>
-            </form>
-          </div>
-          <div class="panel">
-            <h3>Campaign Queue</h3>
-            <table>
-              <thead><tr><th>Name</th><th>Template</th><th>Group</th><th>Status</th><th>Results</th></tr></thead>
-              <tbody id="campaign-table"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="templates" class="view">
-          <div class="panel"><h3>Email Templates</h3><div id="template-list" class="list"></div></div>
-        </section>
-
-        <section id="landing-pages" class="view">
-          <div class="panel"><h3>Landing Pages</h3><div id="landing-list" class="list"></div></div>
-        </section>
-
-        <section id="users" class="view">
-          <div class="panel"><h3>User Groups</h3><div id="group-list" class="list"></div></div>
-        </section>
-
-        <section id="playbook" class="view">
-          <div class="panel">
-            <h3>Phishing Incident Workflow (PICERL)</h3>
-            <ol>
-              <li>Identification: validate sender, auth, URL, and lure pattern.</li>
-              <li>Containment: quarantine email, block sender domain, run ZAP if broad.</li>
-              <li>Evidence: preserve headers, IOC values, and timeline.</li>
-              <li>Eradication: remove malicious artifacts and update deny controls.</li>
-              <li>Recovery: verify impacted users and mailbox integrity.</li>
-              <li>Lessons Learned: document findings and tune detections.</li>
-            </ol>
-          </div>
-        </section>
-      </main>
-    </div>
-  </div>
-
-  <div id="phishrip-modal" class="modal hidden">
+  <div id="phishrip-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="PhishRIP processing dialog">
     <div class="modal-card">
-      <h3>PhishRIP Result</h3>
-      <p id="phishrip-result-text"></p>
-      <button id="close-phishrip-modal" class="primary">Close</button>
+      <h3>PhishRIP Search and Destroy</h3>
+      <p id="phishrip-status">Searching organization mailboxes...</p>
+      <div class="progress">
+        <div id="phishrip-progress" class="progress-bar"></div>
+      </div>
+      <button id="close-modal" aria-label="Close PhishRIP result dialog">Close</button>
     </div>
   </div>
 
