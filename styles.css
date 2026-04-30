@@ -116,6 +116,35 @@ label { display: grid; gap: 4px; font-size: 12px; color: var(--slate); }
 .warn { border: 2px solid #b91c1c; border-radius: 8px; padding: 7px; background: #fee2e2; color: #7f1d1d; }
 .ok { border: 2px solid #047857; border-radius: 8px; padding: 7px; background: #d1fae5; color: #064e3b; }
 .mono { white-space: pre-wrap; font-family: Consolas, "Courier New", monospace; font-size: 11px; }
+.link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.link-row .mono { flex: 1; }
+.shortcut-legend {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #334155;
+  background: #f8fafc;
+}
+.qr-preview {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  width: fit-content;
+}
+.qr-preview img {
+  display: block;
+  width: 160px;
+  height: 160px;
+}
 .hover-hint { font-size: 12px; color: #475569; margin-bottom: 6px; }
 .headers-lab {
   border: 1px solid #cbd5e1;
@@ -164,6 +193,24 @@ label { display: grid; gap: 4px; font-size: 12px; color: var(--slate); }
   border: 2px solid #111827;
   border-radius: 10px;
   padding: 14px;
+}
+.terminal-card {
+  background: #0b1220;
+  color: #d1e4ff;
+  border-color: #1d4ed8;
+}
+.terminal-output {
+  border: 1px solid #1e3a8a;
+  background: #020617;
+  border-radius: 8px;
+  min-height: 180px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  margin: 10px 0;
+  white-space: pre-wrap;
 }
 .progress {
   height: 16px;

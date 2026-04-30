@@ -1,6 +1,20 @@
-const STORE = "phisher-enterprise-v4";
+const STORE = "phisher-enterprise-v5";
 const SHIFT_SECONDS = 30 * 60;
 const TABS = ["preview", "headers", "auth", "links", "attachments"];
+const THREAT_DOMAINS = [
+  "hxxp://bit.ly/3kP0xPh",
+  "hxxps://microsoft-secure-login[.]com",
+  "hxxps://docusign-verify-session[.]net",
+  "hxxps://okta-auth-recovery[.]org",
+  "hxxps://office365-validate-user[.]com"
+];
+const CLEAN_URLS = [
+  "https://okta.com",
+  "https://docusign.com",
+  "https://microsoft.com",
+  "https://google.com",
+  "https://academy.local/intranet"
+];
 
 let state = load();
 let selected = state.incidents[0]?.id || null;
@@ -9,34 +23,28 @@ let shiftTimer = null;
 
 function load() {
   const raw = localStorage.getItem(STORE);
-  if (!raw) {
-    return {
-      incidents: generateIncidents(55),
-      filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" },
-      shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000
-    };
-  }
+  if (!raw) return freshState();
   try {
     const parsed = JSON.parse(raw);
     parsed.incidents = (parsed.incidents || []).map(normalizeIncident);
     parsed.filters = parsed.filters || { room: "all", phishml: "all", priority: "all", status: "all", query: "" };
-    if (!parsed.shiftEndsAt) parsed.shiftEndsAt = Date.now() + SHIFT_SECONDS * 1000;
+    parsed.shiftEndsAt = parsed.shiftEndsAt || (Date.now() + SHIFT_SECONDS * 1000);
     return parsed;
   } catch {
-    return {
-      incidents: generateIncidents(55),
-      filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" },
-      shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000
-    };
+    return freshState();
   }
+}
+
+function freshState() {
+  return {
+    incidents: generateIncidents(55).concat(generateQuishingIncidents(10)),
+    filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" },
+    shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000
+  };
 }
 
 function save() {
   localStorage.setItem(STORE, JSON.stringify(state));
-}
-
-function now() {
-  return new Date().toLocaleString();
 }
 
 function normalizeIncident(i) {
@@ -46,8 +54,14 @@ function normalizeIncident(i) {
     tab: i.tab || "preview",
     tags: i.tags || [],
     noteDraft: i.noteDraft || "",
-    discussion: i.discussion || []
+    discussion: i.discussion || [],
+    attachments: i.attachments || [],
+    extractedQrUrl: i.extractedQrUrl || ""
   };
+}
+
+function now() {
+  return new Date().toLocaleString();
 }
 
 function rand(min, max) {
@@ -66,6 +80,23 @@ function auth(malicious, idx) {
     spf: "spf=pass smtp.mailfrom=academy.local",
     dkim: "dkim=pass header.d=academy.local",
     dmarc: "dmarc=pass p=quarantine"
+  };
+}
+
+function randomHash(len) {
+  const chars = "abcdef0123456789";
+  let out = "";
+  for (let i = 0; i < len; i += 1) out += chars[rand(0, chars.length - 1)];
+  return out;
+}
+
+function makeAttachment(nameBase, suspicious) {
+  const ext = suspicious ? ["pdf.exe", "docm", "html", "zip"][rand(0, 3)] : ["pdf", "docx", "xlsx"][rand(0, 2)];
+  return {
+    name: `${nameBase}.${ext}`,
+    size: `${rand(42, 940)} KB`,
+    md5: randomHash(32),
+    sha256: randomHash(64)
   };
 }
 
@@ -94,7 +125,8 @@ function generateIncidentByType(type, idx) {
     room: "inbox",
     tags: [],
     discussion: [],
-    noteDraft: ""
+    noteDraft: "",
+    extractedQrUrl: ""
   };
   if (type === "ceo_fraud") {
     const from = "CEO Office <ceo@academy-leadership.com>";
@@ -111,33 +143,11 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Urgent request from executive persona to complete same-day transfer.",
-      links: [`https://wire-portal-${idx}.net/approve`],
-      attachments: ["wire_details.pdf"],
+      links: [THREAT_DOMAINS[idx % THREAT_DOMAINS.length]],
+      attachments: [makeAttachment("wire_statement", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
       redFlag: "Reply-To domain does not match executive sender domain."
-    });
-  }
-  if (type === "quishing") {
-    const from = "IT Service Desk <it-support@academy-ithelp.com>";
-    const reply = `security${idx}@academy-ithelp.com`;
-    const a = auth(true, idx);
-    return normalizeIncident({
-      ...base,
-      category: "Quishing",
-      priority: "high",
-      reporter: `user${idx % 20}@academy.local`,
-      subject: `MFA Re-Enrollment Required (QR) ${idx}`,
-      phishml: "threat",
-      phishmlScore: rand(75, 96),
-      from,
-      replyTo: reply,
-      preview: "Scan attached QR code to avoid account lock.",
-      links: [`https://mfa-qr-renew-${idx}.security-check.net`],
-      attachments: ["mfa_update_qr.png"],
-      auth: a,
-      raw: rawHeaders(from, reply, a, idx),
-      redFlag: "QR lure + failing DKIM/DMARC indicates phishing infrastructure."
     });
   }
   if (type === "mfa_fatigue") {
@@ -155,8 +165,8 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Unexpected multiple MFA prompts with urgent 'approve now' language.",
-      links: [`https://identity-approve-${idx}.secure-now.net`],
-      attachments: [],
+      links: [THREAT_DOMAINS[(idx + 1) % THREAT_DOMAINS.length]],
+      attachments: [makeAttachment("mfa_alert", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
       redFlag: "Unexpected MFA approval lure from non-corporate sender domain."
@@ -177,8 +187,8 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Reset link expires in 5 minutes. Immediate action required.",
-      links: [`https://password-reset-${idx}.helpdesk-auth.net`],
-      attachments: ["reset_notice.html"],
+      links: [THREAT_DOMAINS[(idx + 2) % THREAT_DOMAINS.length]],
+      attachments: [makeAttachment("reset_notice", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
       redFlag: "Lookalike support domain and auth failures."
@@ -198,8 +208,8 @@ function generateIncidentByType(type, idx) {
     from,
     replyTo: reply,
     preview: "Internal HR updates and employee engagement announcements.",
-    links: [`https://intranet.academy.local/hr/news/${idx}`],
-    attachments: ["hr_newsletter.pdf"],
+    links: [CLEAN_URLS[idx % CLEAN_URLS.length]],
+    attachments: [makeAttachment("newsletter", false)],
     auth: a,
     raw: rawHeaders(from, reply, a, idx),
     redFlag: "No significant red flag. Legitimate internal communication."
@@ -207,10 +217,47 @@ function generateIncidentByType(type, idx) {
 }
 
 function generateIncidents(total) {
-  const kinds = ["ceo_fraud", "quishing", "mfa_fatigue", "password_reset", "clean"];
+  const kinds = ["ceo_fraud", "mfa_fatigue", "password_reset", "clean"];
+  const out = [];
+  for (let i = 1; i <= total; i += 1) out.push(generateIncidentByType(kinds[(i - 1) % kinds.length], i));
+  return out;
+}
+
+function generateQuishingIncidents(total) {
   const out = [];
   for (let i = 1; i <= total; i += 1) {
-    out.push(generateIncidentByType(kinds[(i - 1) % kinds.length], i));
+    const idx = 9000 + i;
+    const id = `PHI-Q${String(i).padStart(3, "0")}`;
+    const from = "IT Service Desk <it-support@academy-ithelp.com>";
+    const reply = `security${idx}@academy-ithelp.com`;
+    const a = auth(true, idx);
+    const url = THREAT_DOMAINS[i % THREAT_DOMAINS.length];
+    out.push(normalizeIncident({
+      id,
+      icon: "▣",
+      status: "received",
+      date: now(),
+      room: "inbox",
+      category: "Quishing",
+      priority: "high",
+      reporter: `user${i}@academy.local`,
+      subject: `MFA Re-Enrollment Required (QR) Q${i}`,
+      phishml: "threat",
+      phishmlScore: rand(76, 98),
+      from,
+      replyTo: reply,
+      preview: "Scan QR code to restore MFA access.",
+      links: [url],
+      attachments: [makeAttachment("mfa_qr", true)],
+      auth: a,
+      raw: rawHeaders(from, reply, a, idx),
+      redFlag: "QR-code lure paired with suspicious domain and failing auth.",
+      tags: [],
+      discussion: [],
+      noteDraft: "",
+      qrData: url,
+      extractedQrUrl: ""
+    }));
   }
   return out;
 }
@@ -235,6 +282,11 @@ function confidenceColor(score) {
 
 function isLocked() {
   return Date.now() >= state.shiftEndsAt;
+}
+
+function getDomain(link) {
+  const normalized = link.replace(/^hxxps?:\/\//, "").replace(/^https?:\/\//, "").replace(/\[\.\]/g, ".").split("/")[0];
+  return normalized;
 }
 
 function filtered() {
@@ -281,6 +333,39 @@ function renderRows() {
   }));
 }
 
+function renderPreviewTab(i, mismatch) {
+  const qr = i.category === "Quishing" ? `
+    <div class="qr-preview">
+      <img alt="QR phishing preview" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(i.qrData || i.links[0])}" />
+    </div>
+  ` : "";
+  return `<p>${i.preview}</p>${qr}${answerKey ? `<p class="${mismatch ? "warn" : "ok"}">Red Flag: ${i.redFlag}</p>` : ""}`;
+}
+
+function renderLinksTab(i) {
+  return `
+    ${i.links.map((l) => `
+      <div class="link-row">
+        <span class="mono">${l}</span>
+        <button class="urlscan-btn" data-domain="${getDomain(l)}" aria-label="Search domain on URLScan">Search on URLScan.io</button>
+      </div>
+    `).join("")}
+    ${i.category === "Quishing" ? `<button id="extract-qr-btn" aria-label="Extract URL from QR code">Extract URL from QR Code</button><p class="muted">${i.extractedQrUrl || ""}</p>` : ""}
+  `;
+}
+
+function renderAttachmentsTab(i) {
+  return `
+    <table class="grid">
+      <thead><tr><th>Name</th><th>Size</th><th>MD5</th><th>SHA256</th></tr></thead>
+      <tbody>
+        ${i.attachments.map((a) => `<tr><td>${a.name}</td><td>${a.size}</td><td class="mono">${a.md5}</td><td class="mono">${a.sha256}</td></tr>`).join("")}
+      </tbody>
+    </table>
+    <button id="detonate-btn" aria-label="Detonate selected file in sandbox">Detonate in Sandbox</button>
+  `;
+}
+
 function renderTriage() {
   const pane = document.getElementById("triage-pane");
   const i = state.incidents.find((x) => x.id === selected);
@@ -290,17 +375,7 @@ function renderTriage() {
   }
   const tab = i.tab || "preview";
   const locked = isLocked();
-  const fromDomain = i.from.split("@")[1]?.replace(">", "") || "";
-  const replyDomain = i.replyTo.split("@")[1] || "";
-  const mismatch = fromDomain !== replyDomain;
-  const headerLines = [
-    { text: `From: ${i.from}`, flag: mismatch ? "Display sender domain does not align with reply route." : "" },
-    { text: `Reply-To: ${i.replyTo}`, flag: mismatch ? "Reply-To points to different domain than From." : "" },
-    { text: `X-Sender: ${i.replyTo}`, flag: mismatch ? "X-Sender corroborates redirected reply path." : "" },
-    { text: `SPF: ${i.auth.spf}`, flag: i.auth.spf.includes("fail") ? "SPF failure indicates unauthorized sending host." : "" },
-    { text: `DKIM: ${i.auth.dkim}`, flag: i.auth.dkim.includes("fail") ? "DKIM failure suggests signing mismatch or tampering." : "" },
-    { text: `DMARC: ${i.auth.dmarc}`, flag: i.auth.dmarc.includes("fail") ? "DMARC failure indicates policy violation/spoofing risk." : "" }
-  ];
+  const mismatch = i.from.split("@")[1]?.replace(">", "") !== i.replyTo.split("@")[1];
   pane.innerHTML = `
     <div class="confidence">
       <div class="confidence-head">
@@ -315,17 +390,11 @@ function renderTriage() {
       ${TABS.map((t) => `<button class="tab ${t === tab ? "active" : ""}" data-tab="${t}" aria-label="Open ${t} tab">${t.toUpperCase()}</button>`).join("")}
     </div>
     <div class="tab-panel">
-      ${tab === "preview" ? `<p>${i.preview}</p>${answerKey ? `<p class="${mismatch ? "warn" : "ok"}">Red Flag: ${i.redFlag}</p>` : ""}` : ""}
-      ${tab === "headers" ? `
-        <div class="hover-hint">Hover suspicious header lines to inspect red flags.</div>
-        <div class="headers-lab">
-          ${headerLines.map((line) => `<div class="header-line ${line.flag ? "suspicious" : ""}" data-flag="${line.flag || ""}" aria-label="Header line">${line.text}</div>`).join("")}
-        </div>
-        <div id="header-flag-detail" class="${mismatch ? "warn" : "ok"}">${mismatch ? "Hover a highlighted line to view specific red-flag rationale." : "No critical mismatches detected in primary headers."}</div>
-      ` : ""}
+      ${tab === "preview" ? renderPreviewTab(i, mismatch) : ""}
+      ${tab === "headers" ? `<p><strong>From:</strong> ${i.from}<br><strong>Reply-To:</strong> ${i.replyTo}</p><p class="${mismatch ? "warn" : "ok"}">${mismatch ? "From/Reply-To mismatch detected." : "No mismatch detected."}</p>` : ""}
       ${tab === "auth" ? `<p>SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}</p>` : ""}
-      ${tab === "links" ? `<ul>${i.links.map((l) => `<li class="mono">${l}</li>`).join("")}</ul>` : ""}
-      ${tab === "attachments" ? `<ul>${i.attachments.map((a) => `<li>${a}</li>`).join("")}</ul><pre class="mono">${i.raw}</pre>` : ""}
+      ${tab === "links" ? renderLinksTab(i) : ""}
+      ${tab === "attachments" ? renderAttachmentsTab(i) : ""}
     </div>
     <div class="actions">
       <button id="assign-btn" aria-label="Assign incident">Assign</button>
@@ -338,6 +407,7 @@ function renderTriage() {
     <label>Analyst Notes (Auto-save)
       <textarea id="analyst-notes" aria-label="Analyst notes area" rows="5" ${locked ? "disabled" : ""}>${i.noteDraft || ""}</textarea>
     </label>
+    <div class="shortcut-legend"><strong>Shortcuts:</strong> T = Threat, S = Spam, C = Clean</div>
     <div class="log">${i.discussion.slice().reverse().map((d) => `<div>${d.icon} ${d.ts} - ${d.text}</div>`).join("") || "No logs yet."}</div>
   `;
 
@@ -346,19 +416,6 @@ function renderTriage() {
     save();
     renderTriage();
   }));
-  const headerDetail = pane.querySelector("#header-flag-detail");
-  if (headerDetail) {
-    pane.querySelectorAll(".header-line.suspicious").forEach((line) => {
-      line.addEventListener("mouseenter", () => {
-        pane.querySelectorAll(".header-line").forEach((x) => x.classList.remove("active-flag"));
-        line.classList.add("active-flag");
-        headerDetail.textContent = line.dataset.flag;
-      });
-      line.addEventListener("mouseleave", () => {
-        line.classList.remove("active-flag");
-      });
-    });
-  }
   pane.querySelector("#assign-btn").addEventListener("click", () => clickAction(i, "👤", "Assigned to analyst."));
   pane.querySelector("#review-btn").addEventListener("click", () => {
     if (i.status === "received") {
@@ -378,6 +435,29 @@ function renderTriage() {
   });
   pane.querySelector("#block-btn").addEventListener("click", () => clickAction(i, "⛔", "Sender domain blocked."));
   pane.querySelector("#phishrip-btn").addEventListener("click", () => runPhishRip(i));
+
+  pane.querySelectorAll(".urlscan-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const domain = btn.dataset.domain;
+      window.open(`https://urlscan.io/search/#domain:${encodeURIComponent(domain)}`, "_blank", "noopener,noreferrer");
+      appendLog(i, "🔎", `Pivoted to URLScan search for ${domain}.`, "analyst");
+      save();
+    });
+  });
+
+  const extractBtn = pane.querySelector("#extract-qr-btn");
+  if (extractBtn) {
+    extractBtn.addEventListener("click", () => {
+      i.extractedQrUrl = i.qrData || i.links[0];
+      appendLog(i, "▣", `Extracted URL from QR code: ${i.extractedQrUrl}`, "analyst");
+      save();
+      renderTriage();
+    });
+  }
+
+  const detonateBtn = pane.querySelector("#detonate-btn");
+  if (detonateBtn) detonateBtn.addEventListener("click", () => runDetonation(i));
+
   const notes = pane.querySelector("#analyst-notes");
   notes.addEventListener("input", () => {
     i.noteDraft = notes.value;
@@ -415,6 +495,47 @@ function runPhishRip(i) {
   }, 180);
 }
 
+function runDetonation(i) {
+  const modal = document.getElementById("detonate-modal");
+  const out = document.getElementById("detonate-output");
+  modal.classList.remove("hidden");
+  const file = i.attachments[0];
+  const lines = [
+    `[${now()}] Initializing sandbox container...`,
+    `[${now()}] Mounting sample: ${file.name}`,
+    `[${now()}] Analyzing file structure...`,
+    `[${now()}] Static signature check... suspicious entropy detected`,
+    `[${now()}] Heuristic check: Malicious API calls detected`,
+    `[${now()}] Network emulation: C2 beacon attempt observed`,
+    `[${now()}] Verdict: MALICIOUS`
+  ];
+  out.textContent = "";
+  let idx = 0;
+  const timer = setInterval(() => {
+    out.textContent += `${lines[idx]}\n`;
+    out.scrollTop = out.scrollHeight;
+    idx += 1;
+    if (idx >= lines.length) {
+      clearInterval(timer);
+      appendLog(i, "💣", `Detonation completed for ${file.name}. Verdict: malicious behavior observed.`, "sandbox");
+      save();
+    }
+  }, 380);
+}
+
+function classifySelected(label) {
+  if (isLocked()) return;
+  const i = state.incidents.find((x) => x.id === selected);
+  if (!i) return;
+  i.phishml = label;
+  if (label === "threat") i.priority = "high";
+  if (label === "spam") i.priority = "medium";
+  if (label === "clean") i.priority = "low";
+  appendLog(i, "⌨", `Shortcut classification set to ${label.toUpperCase()}.`, "analyst");
+  save();
+  renderAll();
+}
+
 function updateTimer() {
   const el = document.getElementById("shift-timer");
   const left = Math.max(0, Math.floor((state.shiftEndsAt - Date.now()) / 1000));
@@ -435,13 +556,21 @@ function bind() {
   document.getElementById("search-filter").addEventListener("input", (e) => { state.filters.query = e.target.value; save(); renderRows(); });
   document.getElementById("answer-key-toggle").addEventListener("click", () => { answerKey = !answerKey; renderTriage(); });
   document.getElementById("reset-sim").addEventListener("click", () => {
-    state = { incidents: generateIncidents(55), filters: { room: "all", phishml: "all", priority: "all", status: "all", query: "" }, shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000 };
+    state = freshState();
     selected = state.incidents[0]?.id || null;
     answerKey = false;
     save();
     renderAll();
   });
   document.getElementById("close-modal").addEventListener("click", () => document.getElementById("phishrip-modal").classList.add("hidden"));
+  document.getElementById("close-detonate-modal").addEventListener("click", () => document.getElementById("detonate-modal").classList.add("hidden"));
+  document.addEventListener("keydown", (e) => {
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    const k = e.key.toLowerCase();
+    if (k === "t") classifySelected("threat");
+    if (k === "s") classifySelected("spam");
+    if (k === "c") classifySelected("clean");
+  });
 }
 
 function hydrate() {
