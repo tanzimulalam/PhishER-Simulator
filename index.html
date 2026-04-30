@@ -7,149 +7,189 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="top-strip">
-    <div class="brand">KnowB4 Phishing Simulator</div>
-    <div class="meta">Tenant: SOC-Training-Lab</div>
-  </div>
+  <section id="login-screen" class="login-screen">
+    <div class="login-card">
+      <h1>KnowB4 Phishing Simulator</h1>
+      <p>Instructor/Student training environment</p>
+      <form id="login-form">
+        <label>Name <input id="login-name" required placeholder="e.g., Fahim or Student A" /></label>
+        <label>Role
+          <select id="login-role">
+            <option value="student">Student</option>
+            <option value="instructor">Instructor</option>
+          </select>
+        </label>
+        <button class="primary" type="submit">Enter Simulator</button>
+      </form>
+    </div>
+  </section>
 
-  <div class="layout">
-    <aside class="side">
-      <div class="side-title">Navigation</div>
-      <button class="nav-link active" data-view="dashboard">Dashboard</button>
-      <button class="nav-link" data-view="inbox">PhishER Inbox</button>
-      <button class="nav-link" data-view="campaigns">Campaigns</button>
-      <button class="nav-link" data-view="templates">Email Templates</button>
-      <button class="nav-link" data-view="landing-pages">Landing Pages</button>
-      <button class="nav-link" data-view="users">Users & Groups</button>
-      <button class="nav-link" data-view="playbook">IR Playbook</button>
-    </aside>
+  <div id="app-root" class="app-root hidden">
+    <div class="top-strip">
+      <div class="brand">KnowB4 Phishing Simulator</div>
+      <div class="meta">
+        <span id="active-user-pill" class="tag">Student</span>
+        <button id="logout-btn" class="soft-btn">Sign out</button>
+      </div>
+    </div>
 
-    <main class="content">
-      <header class="page-header">
-        <h1 id="view-title">Dashboard</h1>
-        <div class="header-actions">
-          <span class="tag">Simulator Mode</span>
-          <button id="reset-lab" class="soft-btn">Reset Lab</button>
-        </div>
-      </header>
+    <div class="layout">
+      <aside class="side">
+        <div class="side-title">Navigation</div>
+        <button class="nav-link active" data-view="dashboard">Dashboard</button>
+        <button class="nav-link" data-view="inbox">PhishER Inbox</button>
+        <button class="nav-link" data-view="scoreboard">Scoreboard</button>
+        <button class="nav-link" data-view="campaigns">Campaigns</button>
+        <button class="nav-link" data-view="templates">Email Templates</button>
+        <button class="nav-link" data-view="landing-pages">Landing Pages</button>
+        <button class="nav-link" data-view="users">Users & Groups</button>
+        <button class="nav-link" data-view="playbook">IR Playbook</button>
+      </aside>
 
-      <section id="dashboard" class="view active">
-        <div class="metric-grid" id="metric-cards"></div>
-        <div class="panel">
-          <h3>Instructor Brief</h3>
-          <p>Students must investigate queued emails, classify phishing vs benign, take response actions, and document decisions like a SOC analyst.</p>
-        </div>
-      </section>
-
-      <section id="inbox" class="view">
-        <div class="panel filters">
-          <label>Status
-            <select id="filter-status">
-              <option value="all">All</option>
-              <option value="requires_attention">Requires Attention</option>
-              <option value="in_progress">In Progress</option>
-              <option value="resolved">Resolved</option>
-            </select>
-          </label>
-          <label>Severity
-            <select id="filter-severity">
-              <option value="all">All</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <label>Search
-            <input id="filter-search" placeholder="subject, sender, domain" />
-          </label>
-        </div>
-        <div class="inbox-layout">
-          <div class="panel table-panel">
-            <table>
-              <thead>
-                <tr>
-                  <th>Incident</th>
-                  <th>Severity</th>
-                  <th>Status</th>
-                  <th>Source</th>
-                  <th>Received</th>
-                </tr>
-              </thead>
-              <tbody id="incident-table"></tbody>
-            </table>
+      <main class="content">
+        <header class="page-header">
+          <h1 id="view-title">Dashboard</h1>
+          <div class="header-actions">
+            <label>Scenario Pack
+              <select id="scenario-pack">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <button id="load-pack" class="soft-btn">Load Pack</button>
+            <button id="export-report" class="soft-btn">Export Report CSV</button>
+            <button id="reset-lab" class="soft-btn">Reset Lab</button>
           </div>
+        </header>
 
-          <div class="detail-stack">
-            <div class="panel" id="incident-detail"></div>
-            <div class="panel">
-              <h3>Decision Guide</h3>
-              <ul>
-                <li>Begin Work before actioning the ticket.</li>
-                <li>Use auth failures + domain age + lure context for TP/FP call.</li>
-                <li>Contain first: quarantine, block, ZAP.</li>
-                <li>Resolve only after adding a written note.</li>
-              </ul>
+        <section id="dashboard" class="view active">
+          <div class="metric-grid" id="metric-cards"></div>
+          <div class="panel">
+            <h3>Instructor Brief</h3>
+            <p>Students investigate queued emails, classify phishing vs benign, execute containment, and document evidence-based decisions.</p>
+          </div>
+        </section>
+
+        <section id="inbox" class="view">
+          <div class="panel filters">
+            <label>Status
+              <select id="filter-status">
+                <option value="all">All</option>
+                <option value="requires_attention">Requires Attention</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </label>
+            <label>Severity
+              <select id="filter-severity">
+                <option value="all">All</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <label>Search
+              <input id="filter-search" placeholder="subject, sender, domain" />
+            </label>
+          </div>
+          <div class="inbox-layout">
+            <div class="panel table-panel">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Incident</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                    <th>Received</th>
+                  </tr>
+                </thead>
+                <tbody id="incident-table"></tbody>
+              </table>
+            </div>
+
+            <div class="detail-stack">
+              <div class="panel" id="incident-detail"></div>
+              <div class="panel">
+                <h3>Decision Guide</h3>
+                <ul>
+                  <li>Begin Work before actioning the ticket.</li>
+                  <li>Contain before close: quarantine/block/ZAP as needed.</li>
+                  <li>Add a note with evidence before final resolution.</li>
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section id="campaigns" class="view">
-        <div class="panel">
-          <h3>Campaign Builder</h3>
-          <form id="campaign-form" class="form-grid">
-            <label>Campaign Name <input id="campaign-name" required /></label>
-            <label>Email Template <select id="campaign-template"></select></label>
-            <label>Landing Page <select id="campaign-landing"></select></label>
-            <label>User Group <select id="campaign-group"></select></label>
-            <button>Create Campaign</button>
-          </form>
-        </div>
-        <div class="panel">
-          <h3>Campaign Queue</h3>
-          <table>
-            <thead><tr><th>Name</th><th>Template</th><th>Group</th><th>Status</th><th>Results</th></tr></thead>
-            <tbody id="campaign-table"></tbody>
-          </table>
-        </div>
-      </section>
+        <section id="scoreboard" class="view">
+          <div class="panel">
+            <h3>Student Leaderboard</h3>
+            <table>
+              <thead><tr><th>Analyst</th><th>Role</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
+              <tbody id="scoreboard-table"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h3>Grading Rubric</h3>
+            <ul>
+              <li>Correct verdict (TP/FP): 40%</li>
+              <li>Appropriate containment action: 30%</li>
+              <li>Quality documentation note present: 20%</li>
+              <li>Workflow discipline (Begin Work + Resolve): 10%</li>
+            </ul>
+          </div>
+        </section>
 
-      <section id="templates" class="view">
-        <div class="panel">
-          <h3>Email Templates</h3>
-          <div id="template-list" class="list"></div>
-        </div>
-      </section>
+        <section id="campaigns" class="view">
+          <div class="panel">
+            <h3>Campaign Builder</h3>
+            <form id="campaign-form" class="form-grid">
+              <label>Campaign Name <input id="campaign-name" required /></label>
+              <label>Email Template <select id="campaign-template"></select></label>
+              <label>Landing Page <select id="campaign-landing"></select></label>
+              <label>User Group <select id="campaign-group"></select></label>
+              <button>Create Campaign</button>
+            </form>
+          </div>
+          <div class="panel">
+            <h3>Campaign Queue</h3>
+            <table>
+              <thead><tr><th>Name</th><th>Template</th><th>Group</th><th>Status</th><th>Results</th></tr></thead>
+              <tbody id="campaign-table"></tbody>
+            </table>
+          </div>
+        </section>
 
-      <section id="landing-pages" class="view">
-        <div class="panel">
-          <h3>Landing Pages</h3>
-          <div id="landing-list" class="list"></div>
-        </div>
-      </section>
+        <section id="templates" class="view">
+          <div class="panel"><h3>Email Templates</h3><div id="template-list" class="list"></div></div>
+        </section>
 
-      <section id="users" class="view">
-        <div class="panel">
-          <h3>User Groups</h3>
-          <div id="group-list" class="list"></div>
-        </div>
-      </section>
+        <section id="landing-pages" class="view">
+          <div class="panel"><h3>Landing Pages</h3><div id="landing-list" class="list"></div></div>
+        </section>
 
-      <section id="playbook" class="view">
-        <div class="panel">
-          <h3>Phishing Incident Workflow (PICERL)</h3>
-          <ol>
-            <li>Identification: inspect headers, sender, URL, file indicators.</li>
-            <li>Containment: quarantine, block domain, run ZAP if widespread.</li>
-            <li>Evidence: preserve message headers, URL intel, recipient list.</li>
-            <li>Eradication: remove residual artifacts and malicious allow entries.</li>
-            <li>Recovery: verify affected users and mailbox health.</li>
-            <li>Lessons Learned: tune detections, update playbook, debrief.</li>
-          </ol>
-        </div>
-      </section>
-    </main>
+        <section id="users" class="view">
+          <div class="panel"><h3>User Groups</h3><div id="group-list" class="list"></div></div>
+        </section>
+
+        <section id="playbook" class="view">
+          <div class="panel">
+            <h3>Phishing Incident Workflow (PICERL)</h3>
+            <ol>
+              <li>Identification: validate sender, auth, URL, and lure pattern.</li>
+              <li>Containment: quarantine email, block sender domain, run ZAP if broad.</li>
+              <li>Evidence: preserve headers, IOC values, and timeline.</li>
+              <li>Eradication: remove malicious artifacts and update deny controls.</li>
+              <li>Recovery: verify impacted users and mailbox integrity.</li>
+              <li>Lessons Learned: document findings and tune detections.</li>
+            </ol>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="app.js"></script>

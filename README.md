@@ -6,6 +6,7 @@ This simulator is designed for classroom use to help students practice phishing 
 
 ## What This Simulator Includes
 
+- **Role-based login** (Instructor / Student session mode)
 - **Dashboard** with live incident and resolution metrics
 - **PhishER-style Inbox** with severity/status filtering
 - **Incident Investigation Panel** with:
@@ -26,6 +27,9 @@ This simulator is designed for classroom use to help students practice phishing 
 - **Campaign Builder Module** (template + landing page + group workflow)
 - **PICERL-aligned IR Playbook View**
 - **One-click Reset Lab** to restore clean training state
+- **Scenario packs** (`easy`, `medium`, `hard`) for progressive difficulty
+- **Leaderboard + rubric-based scoring** for student assessment
+- **CSV report export** for after-class review
 
 ## Quick Start
 
@@ -60,6 +64,16 @@ Recommended 30-45 minute lab:
 4. Apply the most appropriate containment/response action.
 5. Record structured notes as if writing a real SOC ticket.
 6. Debrief false positives, true positives, and escalation quality.
+
+## Phase 2 Features
+
+This version adds structured classroom operations:
+
+1. Sign in as instructor or student.
+2. Select scenario difficulty pack.
+3. Run triage and response actions.
+4. Track student scores on the leaderboard.
+5. Export incident report as CSV for grading evidence.
 
 ## Learning Outcomes
 
