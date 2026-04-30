@@ -21,7 +21,8 @@ body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--
   border-bottom: 2px solid #00152d;
 }
 
-.brand { font-weight: 700; }
+.brand { font-weight: 800; font-size: 20px; letter-spacing: 0.4px; font-family: "Segoe UI", "Inter", Arial, sans-serif; }
+.brand-mark { color: #7dd3fc; }
 .top-controls { display: flex; gap: 8px; align-items: center; }
 .top-nav { display: flex; gap: 6px; align-items: center; }
 .view-btn.active { background: #bfdbfe; border-color: #1d4ed8; }
@@ -278,6 +279,27 @@ label { display: grid; gap: 4px; font-size: 12px; color: var(--slate); }
   overflow: hidden;
 }
 .metric-fill { height: 100%; background: #1d4ed8; }
+.debrief {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 12px;
+}
+.toast {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1000;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 2px solid #065f46;
+  background: #d1fae5;
+  color: #064e3b;
+  font-weight: 700;
+}
 
 body.high-contrast {
   background: #000;
@@ -289,7 +311,7 @@ body.high-contrast .dash-card,
 body.high-contrast .modal-card {
   background: #000;
   color: #fff;
-  border: 3px solid #ffeb3b;
+  border: 3px solid #FFD700;
 }
 body.high-contrast button,
 body.high-contrast input,
@@ -297,18 +319,18 @@ body.high-contrast select,
 body.high-contrast textarea {
   background: #000;
   color: #fff;
-  border: 3px solid #ffeb3b;
+  border: 3px solid #FFD700;
 }
 body.high-contrast .tab.active,
 body.high-contrast .view-btn.active {
-  background: #ffeb3b;
+  background: #FFD700;
   color: #000;
 }
 body.high-contrast .grid th,
 body.high-contrast .grid td,
 body.high-contrast .log,
 body.high-contrast .tab-panel {
-  border-color: #ffeb3b;
+  border-color: #FFD700;
   background: #000;
   color: #fff;
 }
@@ -316,6 +338,12 @@ body.high-contrast .mono,
 body.high-contrast .header-line,
 body.high-contrast .terminal-output {
   font-size: 14px;
+}
+body.high-contrast .debrief,
+body.high-contrast .toast {
+  background: #000;
+  color: #FFD700;
+  border: 3px solid #FFD700;
 }
 
 @media (max-width: 1400px) {

@@ -1,19 +1,17 @@
 const STORE = "phisher-enterprise-v7";
 const SHIFT_SECONDS = 30 * 60;
 const TABS = ["preview", "headers", "auth", "links", "attachments"];
-const THREAT_DOMAINS = [
-  "hxxp://bit.ly/3kP0xPh",
-  "hxxps://microsoft-secure-login[.]com",
-  "hxxps://docusign-verify-session[.]net",
-  "hxxps://okta-auth-recovery[.]org",
-  "hxxps://office365-validate-user[.]com"
-];
+const THREAT_URLS = {
+  itSupport: "https://help-okta-auth.com",
+  office365: "https://com-verify.ru",
+  shipping: "https://shipping-tracker-update.com",
+  cfoWire: "https://sharepoint-docs-access.net",
+  knownKit: "https://microsoft-update.xyz"
+};
 const CLEAN_URLS = [
-  "https://okta.com",
-  "https://docusign.com",
-  "https://microsoft.com",
-  "https://google.com",
-  "https://academy.local/intranet"
+  "https://yourcompany.com",
+  "https://workday.com",
+  "https://zoom.us"
 ];
 const USER_PROFILES = {
   "Maya Torres (CFO)": { department: "Finance", riskScore: 94 },
@@ -24,6 +22,15 @@ const USER_PROFILES = {
   "Omar Khan (Finance Manager)": { department: "Finance", riskScore: 86 },
   "Jui Sarker (Operations)": { department: "Operations", riskScore: 52 }
 };
+const REASON_CODES = [
+  "Authentication Failure",
+  "Domain Spoofing",
+  "Malicious Link",
+  "Malicious Attachment",
+  "Social Engineering",
+  "Known Safe Sender",
+  "Internal Communication"
+];
 
 let state = load();
 let selected = state.incidents[0]?.id || null;
@@ -42,6 +49,8 @@ function load() {
     parsed.currentView = parsed.currentView || "inbox";
     parsed.highContrast = Boolean(parsed.highContrast);
     parsed.finalFiveInjected = Boolean(parsed.finalFiveInjected);
+    parsed.muted = Boolean(parsed.muted);
+    parsed.tutorialSeen = Boolean(parsed.tutorialSeen);
     return parsed;
   } catch {
     return freshState();
@@ -55,13 +64,46 @@ function freshState() {
     shiftEndsAt: Date.now() + SHIFT_SECONDS * 1000,
     currentView: "inbox",
     highContrast: false,
-    finalFiveInjected: false
+    finalFiveInjected: false,
+    muted: false,
+    tutorialSeen: false
   };
 }
 
 function save() {
   state.currentView = currentView;
   localStorage.setItem(STORE, JSON.stringify(state));
+}
+
+function playTone(freq, durationMs, type = "sine", volume = 0.04) {
+  if (state.muted) return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  const ctx = new AudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.value = volume;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  setTimeout(() => {
+    osc.stop();
+    ctx.close();
+  }, durationMs);
+}
+
+function playCue(name) {
+  if (name === "resolve") {
+    playTone(840, 90, "triangle", 0.05);
+    setTimeout(() => playTone(1240, 120, "triangle", 0.05), 100);
+  } else if (name === "datastream") {
+    [420, 520, 620, 720].forEach((f, idx) => setTimeout(() => playTone(f, 75, "square", 0.02), idx * 85));
+  } else if (name === "warning") {
+    playTone(320, 180, "sawtooth", 0.06);
+    setTimeout(() => playTone(260, 180, "sawtooth", 0.06), 200);
+  }
 }
 
 function normalizeIncident(i) {
@@ -75,7 +117,9 @@ function normalizeIncident(i) {
     attachments: i.attachments || [],
     extractedQrUrl: i.extractedQrUrl || "",
     expectedDisposition: i.expectedDisposition || i.phishml,
-    reporterProfile: i.reporterProfile || inferReporterProfile(i.reporter)
+    reporterProfile: i.reporterProfile || inferReporterProfile(i.reporter),
+    reasonCode: i.reasonCode || "",
+    pendingDisposition: i.pendingDisposition || i.phishml
   };
 }
 
@@ -179,7 +223,7 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Urgent request from executive persona to complete same-day transfer.",
-      links: [THREAT_DOMAINS[idx % THREAT_DOMAINS.length]],
+      links: [makeLink("https://sharepoint.com/finance-docs", THREAT_URLS.cfoWire, "Impersonation domain tied to wire-fraud lures.")],
       attachments: [makeAttachment("wire_statement", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -204,7 +248,7 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Unexpected multiple MFA prompts with urgent 'approve now' language.",
-      links: [THREAT_DOMAINS[(idx + 1) % THREAT_DOMAINS.length]],
+      links: [makeLink("https://okta.com/security", THREAT_URLS.itSupport, "Typosquatting identity portal observed.")],
       attachments: [makeAttachment("mfa_alert", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -229,7 +273,7 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Reset link expires in 5 minutes. Immediate action required.",
-      links: [THREAT_DOMAINS[(idx + 2) % THREAT_DOMAINS.length]],
+      links: [makeLink("https://portal.office.com", idx % 4 === 0 ? THREAT_URLS.knownKit : THREAT_URLS.office365, "Credential-harvest destination with masked branding.")],
       attachments: [makeAttachment("reset_notice", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -253,7 +297,7 @@ function generateIncidentByType(type, idx) {
     from,
     replyTo: reply,
     preview: "Internal HR updates and employee engagement announcements.",
-    links: [CLEAN_URLS[idx % CLEAN_URLS.length]],
+    links: [makeLink(CLEAN_URLS[idx % CLEAN_URLS.length], CLEAN_URLS[idx % CLEAN_URLS.length], "Known safe corporate domain.")],
     attachments: [makeAttachment("newsletter", false)],
     auth: a,
     raw: rawHeaders(from, reply, a, idx),
@@ -276,7 +320,7 @@ function generateQuishingIncidents(total) {
     const from = "IT Service Desk <it-support@academy-ithelp.com>";
     const reply = `security${idx}@academy-ithelp.com`;
     const a = auth(true, idx);
-    const url = THREAT_DOMAINS[i % THREAT_DOMAINS.length];
+    const url = THREAT_URLS.shipping;
     const reporter = pickReporter(idx, "high");
     out.push(normalizeIncident({
       id,
@@ -295,7 +339,7 @@ function generateQuishingIncidents(total) {
       from,
       replyTo: reply,
       preview: "Scan QR code to restore MFA access.",
-      links: [url],
+      links: [makeLink("https://fedex.com/track", url, "New domain matching shipping pretext campaigns.")],
       attachments: [makeAttachment("mfa_qr", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -350,7 +394,12 @@ function isLocked() {
 }
 
 function getDomain(link) {
-  return link.replace(/^hxxps?:\/\//, "").replace(/^https?:\/\//, "").replace(/\[\.\]/g, ".").split("/")[0];
+  const raw = typeof link === "string" ? link : link.destination;
+  return raw.replace(/^hxxps?:\/\//, "").replace(/^https?:\/\//, "").replace(/\[\.\]/g, ".").split("/")[0];
+}
+
+function makeLink(visibleText, destination, intel = "") {
+  return { visibleText, destination, intel };
 }
 
 function filtered() {
@@ -432,9 +481,10 @@ function renderLinksTab(i) {
   return `
     ${i.links.map((l) => `
       <div class="link-row">
-        <span class="mono">${l}</span>
+        <span class="mono"><strong>Visible Text:</strong> ${l.visibleText}<br><strong>Actual Destination:</strong> ${l.destination}</span>
         <button class="urlscan-btn" data-domain="${getDomain(l)}" aria-label="Search domain on URLScan">Search on URLScan.io</button>
       </div>
+      ${l.intel ? `<p class="muted">OSINT Match: ${l.intel}</p>` : ""}
     `).join("")}
     ${i.category === "Quishing" ? `<button id="extract-qr-btn" aria-label="Extract URL from QR code">Extract URL from QR Code</button><p class="muted">${i.extractedQrUrl || ""}</p>` : ""}
   `;
@@ -462,6 +512,14 @@ function renderTriage() {
   const tab = i.tab || "preview";
   const locked = isLocked();
   const mismatch = i.from.split("@")[1]?.replace(">", "") !== i.replyTo.split("@")[1];
+  const noteLength = (i.noteDraft || "").trim().length;
+  const canResolve = i.status === "in_review" && Boolean(i.reasonCode) && noteLength >= 20;
+  const headerDebrief = mismatch
+    ? "Instructor Note: Reply-To diverges from the sender domain, a classic routing redirection indicator."
+    : "Instructor Note: Header alignment is normal; confirm intent via links and attachment behavior.";
+  const authDebrief = i.auth.spf.includes("fail")
+    ? "Instructor Note: SPF failed because the observed sending source is not authorized for the claimed domain."
+    : "Instructor Note: SPF passed, which can still occur on lookalike domains; continue layered validation.";
   pane.innerHTML = `
     <div class="confidence">
       <div class="confidence-head">
@@ -477,21 +535,30 @@ function renderTriage() {
     </div>
     <div class="tab-panel">
       ${tab === "preview" ? renderPreviewTab(i, mismatch) : ""}
-      ${tab === "headers" ? `<p><strong>From:</strong> ${i.from}<br><strong>Reply-To:</strong> ${i.replyTo}</p><p class="${mismatch ? "warn" : "ok"}">${mismatch ? "From/Reply-To mismatch detected." : "No mismatch detected."}</p>` : ""}
-      ${tab === "auth" ? `<p>SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}</p>` : ""}
+      ${tab === "headers" ? `<p><strong>From:</strong> ${i.from}<br><strong>Reply-To:</strong> ${i.replyTo}</p><p class="${mismatch ? "warn" : "ok"}">${mismatch ? "From/Reply-To mismatch detected." : "No mismatch detected."}</p>${answerKey ? `<div class="debrief">${headerDebrief}</div>` : ""}` : ""}
+      ${tab === "auth" ? `<p>SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}</p>${answerKey ? `<div class="debrief">${authDebrief}</div>` : ""}` : ""}
       ${tab === "links" ? renderLinksTab(i) : ""}
       ${tab === "attachments" ? renderAttachmentsTab(i) : ""}
     </div>
     <div class="actions">
+      <button id="classify-threat-btn" aria-label="Classify threat">Threat</button>
+      <button id="classify-spam-btn" aria-label="Classify spam">Spam</button>
+      <button id="classify-clean-btn" aria-label="Classify clean">Clean</button>
       <button id="assign-btn" aria-label="Assign incident">Assign</button>
       <button id="review-btn" aria-label="Set in review">In Review</button>
-      <button id="resolve-btn" aria-label="Resolve incident">Resolve</button>
+      <button id="resolve-btn" aria-label="Resolve incident" ${canResolve ? "" : "disabled"}>Resolve</button>
       <button id="tag-btn" aria-label="Add threat tag">Add Tag</button>
       <button id="phishrip-btn" aria-label="Run PhishRIP simulation" ${i.phishml !== "threat" ? "disabled" : ""}>Run PhishRIP</button>
       <button id="zap-btn" aria-label="Run zero-hour auto purge" ${i.phishml !== "threat" ? "disabled" : ""}>Run ZAP</button>
       <button id="phishflip-btn" aria-label="Convert threat into simulation" ${i.phishml !== "threat" ? "disabled" : ""}>PhishFlip</button>
       <button id="block-btn" aria-label="Block sender domain">Block</button>
     </div>
+    <label>Reason Code (required)
+      <select id="reason-code" aria-label="Reason code for disposition">
+        <option value="">Select a reason...</option>
+        ${REASON_CODES.map((code) => `<option value="${code}" ${i.reasonCode === code ? "selected" : ""}>${code}</option>`).join("")}
+      </select>
+    </label>
     <label>Analyst Notes (Auto-save)
       <textarea id="analyst-notes" aria-label="Analyst notes area" rows="5" ${locked ? "disabled" : ""}>${i.noteDraft || ""}</textarea>
     </label>
@@ -504,6 +571,9 @@ function renderTriage() {
     save();
     renderTriage();
   }));
+  pane.querySelector("#classify-threat-btn").addEventListener("click", () => setDisposition(i, "threat"));
+  pane.querySelector("#classify-spam-btn").addEventListener("click", () => setDisposition(i, "spam"));
+  pane.querySelector("#classify-clean-btn").addEventListener("click", () => setDisposition(i, "clean"));
   pane.querySelector("#assign-btn").addEventListener("click", () => clickAction(i, "👤", "Assigned to analyst."));
   pane.querySelector("#review-btn").addEventListener("click", () => {
     if (i.status === "received") {
@@ -512,9 +582,11 @@ function renderTriage() {
     }
   });
   pane.querySelector("#resolve-btn").addEventListener("click", () => {
-    if (i.status === "in_review") {
+    if (i.status === "in_review" && i.reasonCode && (i.noteDraft || "").trim().length >= 20) {
       i.status = "resolved";
-      clickAction(i, "✅", "Status changed to Resolved.");
+      clickAction(i, "✅", `Status changed to Resolved. Reason: ${i.reasonCode}.`);
+      showToast(`Incident ${i.id} resolved.`);
+      playCue("resolve");
     }
   });
   pane.querySelector("#tag-btn").addEventListener("click", () => {
@@ -531,7 +603,9 @@ function renderTriage() {
       const domain = btn.dataset.domain;
       window.open(`https://urlscan.io/search/#domain:${encodeURIComponent(domain)}`, "_blank", "noopener,noreferrer");
       appendLog(i, "🔎", `Pivoted to URLScan search for ${domain}.`, "analyst");
+      appendEvidenceClip(i, "Evidence: [OSINT Search Logged]");
       save();
+      renderTriage();
     });
   });
 
@@ -539,6 +613,7 @@ function renderTriage() {
   if (extractBtn) {
     extractBtn.addEventListener("click", () => {
       i.extractedQrUrl = i.qrData || i.links[0];
+      if (typeof i.extractedQrUrl !== "string") i.extractedQrUrl = i.extractedQrUrl.destination;
       appendLog(i, "▣", `Extracted URL from QR code: ${i.extractedQrUrl}`, "analyst");
       save();
       renderTriage();
@@ -552,7 +627,31 @@ function renderTriage() {
   notes.addEventListener("input", () => {
     i.noteDraft = notes.value;
     save();
+    renderTriage();
   });
+  pane.querySelector("#reason-code").addEventListener("change", (e) => {
+    i.reasonCode = e.target.value;
+    save();
+    renderTriage();
+  });
+}
+
+function setDisposition(i, label) {
+  if (isLocked()) return;
+  i.pendingDisposition = label;
+  i.phishml = label;
+  if (label === "threat") i.priority = "high";
+  if (label === "spam") i.priority = "medium";
+  if (label === "clean") i.priority = "low";
+  appendLog(i, "🧭", `Disposition selected: ${label.toUpperCase()}.`, "analyst");
+  save();
+  renderAll();
+}
+
+function appendEvidenceClip(i, clipText) {
+  if (!(i.noteDraft || "").includes(clipText)) {
+    i.noteDraft = `${(i.noteDraft || "").trim()}\n${clipText}`.trim();
+  }
 }
 
 function clickAction(i, icon, text) {
@@ -595,7 +694,7 @@ function runPhishRip(i) {
 }
 
 function runZap(i) {
-  const domain = getDomain(i.links[0] || i.replyTo);
+  const domain = getDomain(i.links[0] || { destination: i.replyTo });
   const removed = rand(7, 110);
   runPhishRIPLike(
     (phase) => (phase === "start" ? `ZAP scanning sender domain ${domain} across tenant...` : `ZAP complete. ${removed} messages purged for domain ${domain}.`),
@@ -618,6 +717,7 @@ function runDetonation(i) {
   const modal = document.getElementById("detonate-modal");
   const out = document.getElementById("detonate-output");
   modal.classList.remove("hidden");
+  playCue("datastream");
   const file = i.attachments[0];
   const lines = [
     `[${now()}] Initializing sandbox container...`,
@@ -628,6 +728,10 @@ function runDetonation(i) {
     `[${now()}] Network emulation: C2 beacon attempt observed`,
     `[${now()}] Verdict: MALICIOUS`
   ];
+  const primaryLink = i.links?.[0]?.destination || "";
+  if (primaryLink.includes("microsoft-update.xyz")) {
+    lines.splice(lines.length - 1, 0, `[${now()}] Matched known phishing kit: "PhishKit-V3-Office365"`);
+  }
   out.textContent = "";
   let idx = 0;
   const timer = setInterval(() => {
@@ -637,7 +741,9 @@ function runDetonation(i) {
     if (idx >= lines.length) {
       clearInterval(timer);
       appendLog(i, "💣", `Detonation completed for ${file.name}. Verdict: malicious behavior observed.`, "sandbox");
+      appendEvidenceClip(i, "Evidence: [Sandbox Detonation Performed]");
       save();
+      renderTriage();
       renderAnalytics();
     }
   }, 380);
@@ -647,13 +753,8 @@ function classifySelected(label) {
   if (isLocked()) return;
   const i = state.incidents.find((x) => x.id === selected);
   if (!i) return;
-  i.phishml = label;
-  if (label === "threat") i.priority = "high";
-  if (label === "spam") i.priority = "medium";
-  if (label === "clean") i.priority = "low";
+  setDisposition(i, label);
   appendLog(i, "⌨", `Shortcut classification set to ${label.toUpperCase()}.`, "analyst");
-  save();
-  renderAll();
 }
 
 function metricBar(label, value, total, color = "#1d4ed8") {
@@ -729,6 +830,7 @@ function updateTimer() {
     const surge = generateSurgeIncidents(rand(3, 5));
     state.incidents = surge.concat(state.incidents);
     state.finalFiveInjected = true;
+    playCue("warning");
     save();
     renderRows();
     renderAnalytics();
@@ -752,6 +854,19 @@ function bind() {
     state.highContrast = !state.highContrast;
     document.body.classList.toggle("high-contrast", state.highContrast);
     save();
+  });
+  document.getElementById("mute-toggle").addEventListener("click", () => {
+    state.muted = !state.muted;
+    document.getElementById("mute-toggle").textContent = `Mute: ${state.muted ? "On" : "Off"}`;
+    save();
+  });
+  document.getElementById("help-toggle").addEventListener("click", () => {
+    document.getElementById("quickstart-modal").classList.remove("hidden");
+  });
+  document.getElementById("close-quickstart").addEventListener("click", () => {
+    state.tutorialSeen = true;
+    save();
+    document.getElementById("quickstart-modal").classList.add("hidden");
   });
   document.getElementById("reset-sim").addEventListener("click", () => {
     localStorage.removeItem(STORE);
@@ -789,6 +904,10 @@ function renderAll() {
   renderAnalytics();
   switchView(currentView);
   document.body.classList.toggle("high-contrast", state.highContrast);
+  document.getElementById("mute-toggle").textContent = `Mute: ${state.muted ? "On" : "Off"}`;
+  if (!state.tutorialSeen) {
+    document.getElementById("quickstart-modal").classList.remove("hidden");
+  }
   updateTimer();
 }
 
@@ -805,7 +924,7 @@ function downloadShiftReport() {
     `Overall Accuracy Score: ${accuracyPct}% (${correct}/${all.length})`,
     `Total Threats Neutralized (PhishRIP/ZAP): ${neutralized}`,
     "",
-    "Threat Incident Submission:"
+    "Threat Incident Submission (includes evidence clips):"
   ];
   threatIncidents.forEach((i) => {
     lines.push(`- ${i.id} | ${i.subject}`);
@@ -820,6 +939,13 @@ function downloadShiftReport() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function showToast(text) {
+  const toast = document.getElementById("toast");
+  toast.textContent = text;
+  toast.classList.remove("hidden");
+  setTimeout(() => toast.classList.add("hidden"), 2000);
 }
 
 currentView = state.currentView || "inbox";

@@ -8,13 +8,15 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">KnowBe4 PhishER - Enterprise SOC</div>
+    <div class="brand"><span class="brand-mark">PhishER</span> Simulator</div>
     <nav class="top-nav" aria-label="Primary views">
       <button id="view-inbox" class="view-btn active" aria-label="Open inbox view">Inbox</button>
       <button id="view-dashboard" class="view-btn" aria-label="Open dashboard view">Dashboard</button>
+      <button id="help-toggle" aria-label="Open quick start tutorial">Quick Start</button>
     </nav>
     <div class="top-controls">
       <span id="shift-timer" class="timer" aria-label="SOC shift countdown">30:00</span>
+      <button id="mute-toggle" aria-label="Toggle audio cues">Mute: Off</button>
       <button id="contrast-toggle" aria-label="Toggle high contrast mode">High Contrast</button>
       <button id="answer-key-toggle" aria-label="Toggle instructor answer key">Instructor Key</button>
       <button id="reset-sim" aria-label="Reset lab and clear saved state">Reset Lab</button>
@@ -105,6 +107,18 @@
       <h3>Sandbox Detonation Lab</h3>
       <div id="detonate-output" class="terminal-output"></div>
       <button id="close-detonate-modal" aria-label="Close detonation modal">Close</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <div id="quickstart-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Quick start tutorial">
+    <div class="modal-card">
+      <h3>New Recruit Quick Start</h3>
+      <p><strong>1.</strong> Monitor the Inbox for priority and PhishML cues.</p>
+      <p><strong>2.</strong> Investigate Headers, Auth, Links, and Attachments before acting.</p>
+      <p><strong>3.</strong> Justify your triage with reason code + evidence-backed notes.</p>
+      <button id="close-quickstart" aria-label="Close quick start tutorial">Start Shift</button>
     </div>
   </div>
 
