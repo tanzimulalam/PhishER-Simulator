@@ -7,46 +7,43 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <h1>KnowB4 Sim</h1>
-      <nav>
-        <button class="nav-link active" data-view="dashboard">Dashboard</button>
-        <button class="nav-link" data-view="inbox">PhishER Inbox</button>
-        <button class="nav-link" data-view="campaigns">Campaigns</button>
-        <button class="nav-link" data-view="templates">Email Templates</button>
-        <button class="nav-link" data-view="landing-pages">Landing Pages</button>
-        <button class="nav-link" data-view="users">Users & Groups</button>
-        <button class="nav-link" data-view="playbook">IR Playbook</button>
-      </nav>
+  <div class="top-strip">
+    <div class="brand">KnowB4 Phishing Simulator</div>
+    <div class="meta">Tenant: SOC-Training-Lab</div>
+  </div>
+
+  <div class="layout">
+    <aside class="side">
+      <div class="side-title">Navigation</div>
+      <button class="nav-link active" data-view="dashboard">Dashboard</button>
+      <button class="nav-link" data-view="inbox">PhishER Inbox</button>
+      <button class="nav-link" data-view="campaigns">Campaigns</button>
+      <button class="nav-link" data-view="templates">Email Templates</button>
+      <button class="nav-link" data-view="landing-pages">Landing Pages</button>
+      <button class="nav-link" data-view="users">Users & Groups</button>
+      <button class="nav-link" data-view="playbook">IR Playbook</button>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <h2 id="view-title">Dashboard</h2>
-          <p>SOC Phishing Incident Training Environment</p>
+    <main class="content">
+      <header class="page-header">
+        <h1 id="view-title">Dashboard</h1>
+        <div class="header-actions">
+          <span class="tag">Simulator Mode</span>
+          <button id="reset-lab" class="soft-btn">Reset Lab</button>
         </div>
-        <div class="pill">Student Mode</div>
       </header>
 
       <section id="dashboard" class="view active">
-        <div class="cards-grid" id="metric-cards"></div>
+        <div class="metric-grid" id="metric-cards"></div>
         <div class="panel">
-          <h3>Training Objectives</h3>
-          <ul>
-            <li>Classify alerts as true positive or false positive.</li>
-            <li>Use SPF, DKIM, DMARC, URL/domain age, and attachment indicators.</li>
-            <li>Take proportionate actions: close, quarantine, block domain, ZAP, escalate.</li>
-            <li>Document reasoning and map actions to PICERL phases.</li>
-          </ul>
+          <h3>Instructor Brief</h3>
+          <p>Students must investigate queued emails, classify phishing vs benign, take response actions, and document decisions like a SOC analyst.</p>
         </div>
       </section>
 
       <section id="inbox" class="view">
-        <div class="toolbar">
-          <label>
-            Status
+        <div class="panel filters">
+          <label>Status
             <select id="filter-status">
               <option value="all">All</option>
               <option value="requires_attention">Requires Attention</option>
@@ -54,8 +51,7 @@
               <option value="resolved">Resolved</option>
             </select>
           </label>
-          <label>
-            Severity
+          <label>Severity
             <select id="filter-severity">
               <option value="all">All</option>
               <option value="critical">Critical</option>
@@ -64,44 +60,49 @@
               <option value="low">Low</option>
             </select>
           </label>
-          <button id="reset-lab" class="secondary">Reset Lab</button>
+          <label>Search
+            <input id="filter-search" placeholder="subject, sender, domain" />
+          </label>
         </div>
-        <div class="split">
-          <div class="table-wrap">
+        <div class="inbox-layout">
+          <div class="panel table-panel">
             <table>
               <thead>
                 <tr>
                   <th>Incident</th>
-                  <th>Sender</th>
                   <th>Severity</th>
                   <th>Status</th>
+                  <th>Source</th>
                   <th>Received</th>
                 </tr>
               </thead>
               <tbody id="incident-table"></tbody>
             </table>
           </div>
-          <div class="panel" id="incident-detail">
-            <h3>Select an incident</h3>
-            <p>Click a row to begin triage.</p>
+
+          <div class="detail-stack">
+            <div class="panel" id="incident-detail"></div>
+            <div class="panel">
+              <h3>Decision Guide</h3>
+              <ul>
+                <li>Begin Work before actioning the ticket.</li>
+                <li>Use auth failures + domain age + lure context for TP/FP call.</li>
+                <li>Contain first: quarantine, block, ZAP.</li>
+                <li>Resolve only after adding a written note.</li>
+              </ul>
+            </div>
           </div>
         </div>
       </section>
 
       <section id="campaigns" class="view">
         <div class="panel">
-          <h3>Create Campaign</h3>
+          <h3>Campaign Builder</h3>
           <form id="campaign-form" class="form-grid">
-            <label>Campaign Name <input required id="campaign-name" /></label>
-            <label>Email Template
-              <select id="campaign-template"></select>
-            </label>
-            <label>Landing Page
-              <select id="campaign-landing"></select>
-            </label>
-            <label>User Group
-              <select id="campaign-group"></select>
-            </label>
+            <label>Campaign Name <input id="campaign-name" required /></label>
+            <label>Email Template <select id="campaign-template"></select></label>
+            <label>Landing Page <select id="campaign-landing"></select></label>
+            <label>User Group <select id="campaign-group"></select></label>
             <button>Create Campaign</button>
           </form>
         </div>
@@ -117,7 +118,6 @@
       <section id="templates" class="view">
         <div class="panel">
           <h3>Email Templates</h3>
-          <p>Preloaded realistic templates for classroom phishing simulations.</p>
           <div id="template-list" class="list"></div>
         </div>
       </section>
@@ -138,14 +138,14 @@
 
       <section id="playbook" class="view">
         <div class="panel">
-          <h3>Phishing IR Quick Playbook (PICERL aligned)</h3>
+          <h3>Phishing Incident Workflow (PICERL)</h3>
           <ol>
-            <li>Identify: Validate indicators (headers, URL, attachment, authentication failures).</li>
-            <li>Contain: Quarantine message, block sender/domain, consider ZAP for widespread delivery.</li>
-            <li>Evidence: Preserve headers, malicious URL, hash, recipient list, and timeline.</li>
-            <li>Eradicate: Remove remaining artifacts, deny related domains/hashes, tune detection.</li>
-            <li>Recover: Verify mailbox restoration and user account integrity.</li>
-            <li>Lessons Learned: Record root cause and update playbooks/rules.</li>
+            <li>Identification: inspect headers, sender, URL, file indicators.</li>
+            <li>Containment: quarantine, block domain, run ZAP if widespread.</li>
+            <li>Evidence: preserve message headers, URL intel, recipient list.</li>
+            <li>Eradication: remove residual artifacts and malicious allow entries.</li>
+            <li>Recovery: verify affected users and mailbox health.</li>
+            <li>Lessons Learned: tune detections, update playbook, debrief.</li>
           </ol>
         </div>
       </section>

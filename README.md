@@ -12,7 +12,7 @@ This simulator is designed for classroom use to help students practice phishing 
   - Sender and subject analysis
   - SPF/DKIM/DMARC results
   - URL and domain age indicators
-  - Attachment hash context
+  - Header preview and message timeline
   - Risk scoring
 - **SOC Response Actions**:
   - Begin Work
@@ -74,8 +74,17 @@ By the end of the exercise, students should be able to:
 ## Project Structure
 
 - `index.html` - Application layout and module views
-- `styles.css` - Dark SOC-style UI theme
+- `styles.css` - Admin-style simulator UI theme
 - `app.js` - Training data, state logic, triage actions, campaign simulation
+
+## Attribution
+
+This simulator is independently implemented and inspired by phishing training workflows from:
+
+- [GoPhish](https://github.com/gophish/gophish)
+- [KnowBe4 PhishER](https://www.knowbe4.com/products/phisher)
+
+Brand names and workflow concepts remain the property of their respective owners.
 
 ## Roadmap (Phase 2+)
 
