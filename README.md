@@ -30,6 +30,8 @@ This simulator is designed for classroom use to help students practice phishing 
 - **Scenario packs** (`easy`, `medium`, `hard`) for progressive difficulty
 - **Leaderboard + rubric-based scoring** for student assessment
 - **CSV report export** for after-class review
+- **Timed exam mode** with countdown and student submission lock
+- **Instructor-only answer key view** for debrief and grading
 
 ## Quick Start
 
@@ -74,6 +76,13 @@ This version adds structured classroom operations:
 3. Run triage and response actions.
 4. Track student scores on the leaderboard.
 5. Export incident report as CSV for grading evidence.
+
+## Phase 3 Features
+
+1. Start timed exam windows (instructor-only control).
+2. Students can submit exam attempts; submission locks further actions.
+3. Exam mode hides answer-like hints for students.
+4. Instructor answer key panel shows recommended verdict/action rationale.
 
 ## Learning Outcomes
 

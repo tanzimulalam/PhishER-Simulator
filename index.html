@@ -39,6 +39,7 @@
         <button class="nav-link active" data-view="dashboard">Dashboard</button>
         <button class="nav-link" data-view="inbox">PhishER Inbox</button>
         <button class="nav-link" data-view="scoreboard">Scoreboard</button>
+        <button class="nav-link" data-view="answer-key">Answer Key</button>
         <button class="nav-link" data-view="campaigns">Campaigns</button>
         <button class="nav-link" data-view="templates">Email Templates</button>
         <button class="nav-link" data-view="landing-pages">Landing Pages</button>
@@ -50,6 +51,12 @@
         <header class="page-header">
           <h1 id="view-title">Dashboard</h1>
           <div class="header-actions">
+            <label>Exam (minutes)
+              <input id="exam-minutes" type="number" min="5" max="180" value="30" />
+            </label>
+            <button id="start-exam" class="soft-btn">Start Exam</button>
+            <button id="submit-exam" class="soft-btn">Submit Exam</button>
+            <span id="exam-timer" class="tag">Exam: Off</span>
             <label>Scenario Pack
               <select id="scenario-pack">
                 <option value="easy">Easy</option>
@@ -68,6 +75,17 @@
           <div class="panel">
             <h3>Instructor Brief</h3>
             <p>Students investigate queued emails, classify phishing vs benign, execute containment, and document evidence-based decisions.</p>
+          </div>
+        </section>
+
+        <section id="answer-key" class="view">
+          <div class="panel">
+            <h3>Instructor Answer Key</h3>
+            <p>Visible to instructors only. Use for debrief and grading.</p>
+            <table>
+              <thead><tr><th>Incident</th><th>Ground Truth</th><th>Recommended Action</th><th>Reasoning</th></tr></thead>
+              <tbody id="answer-key-table"></tbody>
+            </table>
           </div>
         </section>
 

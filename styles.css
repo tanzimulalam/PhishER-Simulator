@@ -153,6 +153,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 button:hover,
 .soft-btn:hover {
   background: #f3f4f6;
@@ -215,6 +220,10 @@ textarea {
   min-width: 170px;
   font-size: 13px;
   background: #ffffff;
+}
+
+input[type="number"] {
+  min-width: 90px;
 }
 
 .inbox-layout {
