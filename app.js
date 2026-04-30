@@ -34,12 +34,32 @@ let activeUser = loadActiveUser();
 let selectedIncidentId = null;
 let examTimerInterval = null;
 
+function normalizeIncident(raw, idx) {
+  const phishing = raw.groundTruth === "phishing";
+  return {
+    ...raw,
+    reporter: raw.reporter || `user${idx + 1}@academy.local`,
+    phishml: raw.phishml || (phishing ? "threat" : "clean"),
+    priority: raw.priority || raw.severity || (phishing ? "high" : "low"),
+    attachments: raw.attachments || (phishing ? ["invoice.docm"] : ["policy.pdf"]),
+    links: raw.links || [raw.url],
+    tags: raw.tags || [],
+    assignee: raw.assignee || null,
+    discussion: raw.discussion || []
+  };
+}
+
+function normalizeState() {
+  state.incidents = (state.incidents || []).map(normalizeIncident);
+}
+
 function loadState() {
   try {
     const parsed = JSON.parse(localStorage.getItem("kb4sim-phase3-state")) || structuredClone(defaultState);
     parsed.exam = parsed.exam || {};
     if (typeof parsed.exam.gradesReleased !== "boolean") parsed.exam.gradesReleased = false;
     parsed.attempts = parsed.attempts || [];
+    parsed.incidents = (parsed.incidents || []).map(normalizeIncident);
     return parsed;
   } catch {
     return structuredClone(defaultState);
@@ -97,20 +117,26 @@ function renderMetrics() {
 }
 
 function incidentMatches(i) {
+  const phishml = document.getElementById("filter-phishml").value;
+  const priority = document.getElementById("filter-priority").value;
   const st = document.getElementById("filter-status").value;
   const sev = document.getElementById("filter-severity").value;
   const q = document.getElementById("filter-search").value.trim().toLowerCase();
-  const ok = (st === "all" || i.status === st) && (sev === "all" || i.severity === sev);
-  return ok && (!q || `${i.id} ${i.subject} ${i.sender} ${i.url}`.toLowerCase().includes(q));
+  const ok = (st === "all" || i.status === st) &&
+    (sev === "all" || i.severity === sev) &&
+    (phishml === "all" || i.phishml === phishml) &&
+    (priority === "all" || i.priority === priority);
+  return ok && (!q || `${i.id} ${i.subject} ${i.sender} ${i.reporter} ${i.url}`.toLowerCase().includes(q));
 }
 
 function renderIncidentTable() {
   document.getElementById("incident-table").innerHTML = state.incidents.filter(incidentMatches).map((i) => `
     <tr data-id="${i.id}">
-      <td><strong>${i.id}</strong><br>${i.subject}</td>
-      <td class="sev-${i.severity}">${i.severity.toUpperCase()}</td>
+      <td>${i.reporter}</td>
+      <td><strong>${i.subject}</strong><br><span class="muted">${i.sender}</span></td>
+      <td><span class="phishml-badge phishml-${i.phishml}">${i.phishml.toUpperCase()}</span></td>
+      <td class="sev-${i.priority}">${i.priority.toUpperCase()}</td>
       <td><span class="status-pill status-${i.status}">${i.status.replaceAll("_", " ")}</span></td>
-      <td>${i.source}</td>
       <td>${i.receivedAt}</td>
     </tr>`).join("");
   document.querySelectorAll("#incident-table tr").forEach((r) => r.addEventListener("click", () => { selectedIncidentId = r.dataset.id; renderIncidentDetail(); }));
@@ -123,30 +149,66 @@ function renderIncidentDetail() {
   const hideAnswers = inExamForStudent();
   const locked = examLocked();
   panel.innerHTML = `
-    <h3>${i.id} - ${i.subject}</h3>
-    <p><strong>Sender:</strong> ${i.sender}</p>
-    <p><strong>Message-ID:</strong> <span class="mono">${i.messageId}</span></p>
-    <div class="evidence-grid">
-      <div class="evidence-item">SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}</div>
-      <div class="evidence-item">URL: ${i.url}<br>Domain age: ${i.domainAgeDays} day(s)<br>Risk: ${hideAnswers ? "Hidden in exam mode" : `${scoreIncident(i)}/100`}</div>
-      <div class="evidence-item"><pre class="mono">${i.headerSnippet}</pre></div>
-      <div class="evidence-item"><ul>${i.timeline.map((t) => `<li>${t}</li>`).join("")}</ul></div>
+    <h3>${i.subject}</h3>
+    <p><strong>Reporter:</strong> ${i.reporter} | <strong>Source:</strong> ${i.source}</p>
+    <div class="detail-two-col">
+      <div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="body">Body</button>
+          <button class="tab-btn" data-tab="headers">Headers</button>
+          <button class="tab-btn" data-tab="auth">Auth</button>
+          <button class="tab-btn" data-tab="attachments">Attachments</button>
+        </div>
+        <div id="tab-body" class="tab-panel active"><p>${i.bodySummary}</p><p><strong>Links:</strong> ${i.links.map((l) => `<span class="mono">${l}</span>`).join("<br>")}</p></div>
+        <div id="tab-headers" class="tab-panel"><pre class="mono">${i.headerSnippet}</pre><p><strong>From:</strong> ${i.sender}<br><strong>Reply-To:</strong> ${i.sender.split("<")[1]?.replace(">", "") || i.sender}</p></div>
+        <div id="tab-auth" class="tab-panel"><p>SPF: ${i.auth.spf}<br>DKIM: ${i.auth.dkim}<br>DMARC: ${i.auth.dmarc}<br>Risk: ${hideAnswers ? "Hidden in exam mode" : `${scoreIncident(i)}/100`}</p></div>
+        <div id="tab-attachments" class="tab-panel"><ul>${i.attachments.map((a) => `<li>${a}</li>`).join("")}</ul></div>
+      </div>
+      <div>
+        <p><strong>Assignee:</strong> ${i.assignee || "Unassigned"}</p>
+        <div class="action-row">
+          <button data-action="assign" ${locked ? "disabled" : ""}>Assign</button>
+          <button data-action="begin" ${locked ? "disabled" : ""}>In Review</button>
+          <button data-action="phishrip" ${locked ? "disabled" : ""}>PhishRIP</button>
+          <button data-action="block_domain" ${locked ? "disabled" : ""}>Blocklist</button>
+          <button data-action="phishflip" ${locked ? "disabled" : ""}>PhishFlip</button>
+          <button data-action="quarantine" ${locked ? "disabled" : ""}>Quarantine</button>
+          <button data-action="resolve" class="primary" ${locked ? "disabled" : ""}>Resolve</button>
+          <button data-action="benign" ${locked ? "disabled" : ""}>Mark Clean</button>
+        </div>
+        <label>Add Tag<input id="incident-tag-input" placeholder="e.g. Credential Harvesting" ${locked ? "disabled" : ""} /></label>
+        <button id="add-tag-btn" ${locked ? "disabled" : ""}>Add Tag</button>
+        <p><strong>Tags:</strong> ${(i.tags || []).join(", ") || "None"}</p>
+        <label>Discussion<textarea id="incident-note" class="note-box" ${locked ? "disabled" : ""}></textarea></label>
+        <button id="save-note" ${locked ? "disabled" : ""}>Post Comment</button>
+      </div>
     </div>
-    <div class="action-row">
-      <button class="primary" data-action="begin" ${locked ? "disabled" : ""}>Begin Work</button>
-      <button data-action="benign" ${locked ? "disabled" : ""}>Mark Benign</button>
-      <button data-action="quarantine" ${locked ? "disabled" : ""}>Quarantine</button>
-      <button data-action="block_domain" ${locked ? "disabled" : ""}>Block Domain</button>
-      <button class="danger" data-action="zap" ${locked ? "disabled" : ""}>Run ZAP</button>
-      <button data-action="escalate" ${locked ? "disabled" : ""}>Escalate</button>
-      <button class="primary" data-action="resolve" ${locked ? "disabled" : ""}>Resolve</button>
-    </div>
-    <label>Investigation Note<textarea id="incident-note" class="note-box" ${locked ? "disabled" : ""}></textarea></label>
-    <button id="save-note" ${locked ? "disabled" : ""}>Save Note</button>
     <h4>Action Log</h4><ul>${i.actions.map((a) => `<li>${a.ts} - ${a.text} (${a.by || "n/a"})</li>`).join("") || "<li>No actions yet</li>"}</ul>
-    <h4>Notes</h4><ul>${i.notes.map((n) => `<li>${n.ts} - ${n.text} (${n.by || "n/a"})</li>`).join("") || "<li>No notes yet</li>"}</ul>
+    <h4>Discussion</h4><ul>${i.notes.map((n) => `<li>${n.ts} - ${n.text} (${n.by || "n/a"})</li>`).join("") || "<li>No comments yet</li>"}</ul>
   `;
+  panel.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      panel.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      panel.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      panel.querySelector(`#tab-${btn.dataset.tab}`).classList.add("active");
+    });
+  });
   panel.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => runAction(i.id, b.dataset.action)));
+  const addTagBtn = panel.querySelector("#add-tag-btn");
+  if (addTagBtn) {
+    addTagBtn.addEventListener("click", () => {
+      const val = panel.querySelector("#incident-tag-input").value.trim();
+      if (!val || !activeUser || examLocked()) return;
+      mutateIncident(i.id, (x) => {
+        x.tags = x.tags || [];
+        if (!x.tags.includes(val)) x.tags.push(val);
+        return x;
+      });
+      saveState();
+      renderAll();
+    });
+  }
   panel.querySelector("#save-note").addEventListener("click", () => {
     if (!activeUser || examLocked()) return;
     const text = panel.querySelector("#incident-note").value.trim();
@@ -166,9 +228,26 @@ function runAction(id, action) {
   if (!activeUser || examLocked()) return;
   const incident = state.incidents.find((x) => x.id === id);
   if (!incident) return;
-  const map = { begin: ["Analyst started ownership.", "in_progress"], benign: ["Marked benign and closed.", "resolved"], quarantine: ["Email quarantined.", "in_progress"], block_domain: ["Domain blocked.", "in_progress"], zap: ["ZAP executed.", "in_progress"], escalate: ["Escalated Tier 2.", "in_progress"], resolve: ["Resolved as phishing.", "resolved"] };
+  const map = {
+    assign: [`Assigned to ${activeUser.name}.`, incident.status],
+    begin: ["Status changed to In Review.", "in_progress"],
+    benign: ["Marked clean and closed.", "resolved"],
+    quarantine: ["Email quarantined from reported mailbox.", "in_progress"],
+    phishrip: ["PhishRIP initiated: searched tenant and removed matching messages.", "in_progress"],
+    phishflip: ["PhishFlip created simulation template from this threat.", incident.status],
+    block_domain: ["Sender domain added to blocklist.", "in_progress"],
+    zap: ["ZAP executed.", "in_progress"],
+    escalate: ["Escalated Tier 2.", "in_progress"],
+    resolve: ["Incident resolved as malicious.", "resolved"]
+  };
   if (!map[action]) return;
-  mutateIncident(id, (i) => { i.actions.push({ ts: now(), text: map[action][0], by: activeUser.name }); i.status = map[action][1]; if (i.status === "resolved") i.resolvedBy = activeUser.name; return i; });
+  mutateIncident(id, (i) => {
+    i.actions.push({ ts: now(), text: map[action][0], by: activeUser.name });
+    i.status = map[action][1];
+    if (action === "assign") i.assignee = activeUser.name;
+    if (i.status === "resolved") i.resolvedBy = activeUser.name;
+    return i;
+  });
   applyPoints(action, incident);
   saveState();
   renderAll();
@@ -243,7 +322,14 @@ function renderLists() {
   document.getElementById("group-list").innerHTML = state.groups.map((g) => `<div class="list-item"><strong>${g.id}</strong> - ${g.name}<br>Users: ${g.users}</div>`).join("");
 }
 
-function loadScenarioPack(name) { if (!scenarioPacks[name]) return; state.activePack = name; state.incidents = structuredClone(scenarioPacks[name]); selectedIncidentId = null; saveState(); renderAll(); }
+function loadScenarioPack(name) {
+  if (!scenarioPacks[name]) return;
+  state.activePack = name;
+  state.incidents = structuredClone(scenarioPacks[name]).map(normalizeIncident);
+  selectedIncidentId = null;
+  saveState();
+  renderAll();
+}
 
 function exportReportCsv() {
   const includeTruth = isInstructor();
@@ -356,7 +442,7 @@ function bindNav() {
 }
 
 function bindInputs() {
-  ["filter-status", "filter-severity"].forEach((id) => document.getElementById(id).addEventListener("change", renderIncidentTable));
+  ["filter-phishml", "filter-priority", "filter-status", "filter-severity"].forEach((id) => document.getElementById(id).addEventListener("change", renderIncidentTable));
   document.getElementById("filter-search").addEventListener("input", renderIncidentTable);
   document.getElementById("load-pack").addEventListener("click", () => loadScenarioPack(document.getElementById("scenario-pack").value));
   document.getElementById("export-report").addEventListener("click", exportReportCsv);
@@ -405,6 +491,7 @@ function renderAll() {
 bindNav();
 bindInputs();
 setAppVisibility();
+normalizeState();
 if (activeUser) {
   if (state.exam.active) {
     if (examTimerInterval) clearInterval(examTimerInterval);

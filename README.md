@@ -103,6 +103,15 @@ This version adds structured classroom operations:
 3. Track section on all exam submissions.
 4. Analytics panel shows section averages and mistake trend counters.
 
+## Realism Upgrade
+
+Inbox and investigation flow now better mirrors operational PhishER handling:
+
+1. Inbox triage includes Reporter, Subject, PhishML, Priority, Status, and Date.
+2. Message details use tabbed analysis (Body, Headers, Auth, Attachments).
+3. Action sidebar supports assignment, tagging, status updates, PhishRIP, Blocklist, and PhishFlip simulation actions.
+4. Discussion thread and action log capture analyst decisions.
+
 ## Learning Outcomes
 
 By the end of the exercise, students should be able to:

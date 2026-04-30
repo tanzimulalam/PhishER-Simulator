@@ -101,6 +101,23 @@
 
         <section id="inbox" class="view">
           <div class="panel filters">
+            <label>PhishML
+              <select id="filter-phishml">
+                <option value="all">All</option>
+                <option value="threat">Threat</option>
+                <option value="spam">Spam</option>
+                <option value="clean">Clean</option>
+              </select>
+            </label>
+            <label>Priority
+              <select id="filter-priority">
+                <option value="all">All</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
             <label>Status
               <select id="filter-status">
                 <option value="all">All</option>
@@ -127,10 +144,11 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Incident</th>
-                    <th>Severity</th>
+                    <th>Reporter</th>
+                    <th>Subject</th>
+                    <th>PhishML</th>
+                    <th>Priority</th>
                     <th>Status</th>
-                    <th>Source</th>
                     <th>Received</th>
                   </tr>
                 </thead>
@@ -140,14 +158,6 @@
 
             <div class="detail-stack">
               <div class="panel" id="incident-detail"></div>
-              <div class="panel">
-                <h3>Decision Guide</h3>
-                <ul>
-                  <li>Begin Work before actioning the ticket.</li>
-                  <li>Contain before close: quarantine/block/ZAP as needed.</li>
-                  <li>Add a note with evidence before final resolution.</li>
-                </ul>
-              </div>
             </div>
           </div>
         </section>
