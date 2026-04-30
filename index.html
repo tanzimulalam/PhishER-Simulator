@@ -121,8 +121,8 @@
             <label>Status
               <select id="filter-status">
                 <option value="all">All</option>
-                <option value="requires_attention">Requires Attention</option>
-                <option value="in_progress">In Progress</option>
+                <option value="received">Received</option>
+                <option value="in_review">In Review</option>
                 <option value="resolved">Resolved</option>
               </select>
             </label>
@@ -259,6 +259,14 @@
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div id="phishrip-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3>PhishRIP Result</h3>
+      <p id="phishrip-result-text"></p>
+      <button id="close-phishrip-modal" class="primary">Close</button>
     </div>
   </div>
 
