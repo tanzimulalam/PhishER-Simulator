@@ -37,6 +37,19 @@ No install or build is required.
 4. Add analyst notes and apply response actions.
 5. Use **Reset Lab** to restart for a new class/cohort.
 
+## GitHub Pages Deployment
+
+This repository is configured with a GitHub Actions workflow to publish the simulator to GitHub Pages on every push to `main`.
+
+- Workflow file: `.github/workflows/deploy-pages.yml`
+- Expected site URL: `https://tanzimulalam.github.io/PhishER-Simulator/`
+
+If this is your first deployment, ensure in repo settings:
+
+1. `Settings` -> `Pages`
+2. Source is set to **GitHub Actions**
+3. Wait for the `Deploy static site to GitHub Pages` workflow to complete
+
 ## Classroom Usage Model
 
 Recommended 30-45 minute lab:
