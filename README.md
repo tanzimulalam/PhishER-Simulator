@@ -32,6 +32,9 @@ This simulator is designed for classroom use to help students practice phishing 
 - **CSV report export** for after-class review
 - **Timed exam mode** with countdown and student submission lock
 - **Instructor-only answer key view** for debrief and grading
+- **Attempt history tracking** per student submission
+- **Instructor grade release toggle** (hide/reveal assessment grades)
+- **PDF report export** (print-ready instructor report)
 
 ## Quick Start
 
@@ -83,6 +86,13 @@ This version adds structured classroom operations:
 2. Students can submit exam attempts; submission locks further actions.
 3. Exam mode hides answer-like hints for students.
 4. Instructor answer key panel shows recommended verdict/action rationale.
+
+## Phase 4 Features
+
+1. Track per-student attempt history at exam submission time.
+2. Keep grades hidden from students until instructor releases them.
+3. Toggle grade visibility using `Release Grades` / `Hide Grades`.
+4. Export print-ready PDF report from the browser.
 
 ## Learning Outcomes
 

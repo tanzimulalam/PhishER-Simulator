@@ -24,7 +24,8 @@ const defaultState = {
   groups: [{ id: "GRP-1", name: "SOC Class A", users: 14 }],
   campaigns: [{ id: "CMP-9001", name: "Week 2 Drill", template: "M365 Security Alert", group: "SOC Class A", status: "Completed", results: "Sent 14 / Open 12 / Click 7 / Submit 3" }],
   scorecards: {},
-  exam: { active: false, startedAt: null, endsAt: null, submittedUsers: [] }
+  exam: { active: false, startedAt: null, endsAt: null, submittedUsers: [], gradesReleased: false },
+  attempts: []
 };
 
 let state = loadState();
@@ -32,7 +33,17 @@ let activeUser = loadActiveUser();
 let selectedIncidentId = null;
 let examTimerInterval = null;
 
-function loadState() { try { return JSON.parse(localStorage.getItem("kb4sim-phase3-state")) || structuredClone(defaultState); } catch { return structuredClone(defaultState); } }
+function loadState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("kb4sim-phase3-state")) || structuredClone(defaultState);
+    parsed.exam = parsed.exam || {};
+    if (typeof parsed.exam.gradesReleased !== "boolean") parsed.exam.gradesReleased = false;
+    parsed.attempts = parsed.attempts || [];
+    return parsed;
+  } catch {
+    return structuredClone(defaultState);
+  }
+}
 function saveState() { localStorage.setItem("kb4sim-phase3-state", JSON.stringify(state)); }
 function loadActiveUser() { try { return JSON.parse(localStorage.getItem("kb4sim-active-user")) || null; } catch { return null; } }
 function saveActiveUser() { if (!activeUser) localStorage.removeItem("kb4sim-active-user"); else localStorage.setItem("kb4sim-active-user", JSON.stringify(activeUser)); }
@@ -163,7 +174,19 @@ function runAction(id, action) {
 
 function renderScoreboard() {
   const rows = Object.entries(state.scorecards).map(([name, s]) => ({ name, role: s.role, score: s.score, resolved: s.resolved, accuracy: s.resolved ? Math.round((s.correctVerdicts / s.resolved) * 100) : 0 })).sort((a, b) => b.score - a.score);
-  document.getElementById("scoreboard-table").innerHTML = rows.map((r) => `<tr><td>${r.name}</td><td>${r.role}</td><td>${r.score}</td><td>${r.resolved}</td><td>${r.accuracy}%</td></tr>`).join("") || "<tr><td colspan='5'>No activity yet.</td></tr>";
+  const canSeeGrades = isInstructor() || state.exam.gradesReleased;
+  document.getElementById("scoreboard-table").innerHTML = rows.map((r) => {
+    const scoreCell = canSeeGrades ? r.score : "Hidden";
+    const accCell = canSeeGrades ? `${r.accuracy}%` : "Hidden";
+    return `<tr><td>${r.name}</td><td>${r.role}</td><td>${scoreCell}</td><td>${r.resolved}</td><td>${accCell}</td></tr>`;
+  }).join("") || "<tr><td colspan='5'>No activity yet.</td></tr>";
+
+  const attempts = state.attempts || [];
+  document.getElementById("attempt-history-table").innerHTML = attempts.map((a) => {
+    const score = canSeeGrades ? a.score : "Hidden";
+    const accuracy = canSeeGrades ? `${a.accuracy}%` : "Hidden";
+    return `<tr><td>${a.student}</td><td>${a.pack}</td><td>${a.submittedAt}</td><td>${score}</td><td>${a.resolved}</td><td>${accuracy}</td></tr>`;
+  }).join("") || "<tr><td colspan='6'>No submissions yet.</td></tr>";
 }
 
 function renderAnswerKey() {
@@ -203,6 +226,33 @@ function exportReportCsv() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
+function exportReportPdf() {
+  const includeTruth = isInstructor() || state.exam.gradesReleased;
+  const entries = Object.entries(state.scorecards).map(([name, s]) => ({
+    name,
+    role: s.role,
+    score: includeTruth ? s.score : "Hidden",
+    resolved: s.resolved,
+    accuracy: includeTruth ? `${s.resolved ? Math.round((s.correctVerdicts / s.resolved) * 100) : 0}%` : "Hidden"
+  }));
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`
+    <html><head><title>Phishing Simulator Report</title>
+    <style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}h1,h2{margin:0 0 10px 0}</style>
+    </head><body>
+    <h1>KnowB4 Phishing Simulator Report</h1>
+    <p>Pack: ${state.activePack.toUpperCase()} | Generated: ${now()}</p>
+    <h2>Scoreboard</h2>
+    <table><thead><tr><th>Analyst</th><th>Role</th><th>Score</th><th>Resolved</th><th>Accuracy</th></tr></thead>
+    <tbody>${entries.map((e) => `<tr><td>${e.name}</td><td>${e.role}</td><td>${e.score}</td><td>${e.resolved}</td><td>${e.accuracy}</td></tr>`).join("")}</tbody></table>
+    </body></html>
+  `);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
 function updateExamTimerUi() {
   const el = document.getElementById("exam-timer");
   if (!state.exam.active || !state.exam.endsAt) { el.textContent = "Exam: Off"; return; }
@@ -224,6 +274,7 @@ function startExam(minutes) {
   state.exam.startedAt = Date.now();
   state.exam.endsAt = Date.now() + minutes * 60000;
   state.exam.submittedUsers = [];
+  state.exam.gradesReleased = false;
   saveState();
   if (examTimerInterval) clearInterval(examTimerInterval);
   examTimerInterval = setInterval(updateExamTimerUi, 1000);
@@ -233,7 +284,28 @@ function startExam(minutes) {
 
 function submitExamForActiveUser() {
   if (!activeUser || !state.exam.active) return;
-  if (!state.exam.submittedUsers.includes(activeUser.name)) state.exam.submittedUsers.push(activeUser.name);
+  if (!state.exam.submittedUsers.includes(activeUser.name)) {
+    state.exam.submittedUsers.push(activeUser.name);
+    upsertScorecard(activeUser.name, activeUser.role);
+    const s = state.scorecards[activeUser.name];
+    const accuracy = s.resolved ? Math.round((s.correctVerdicts / s.resolved) * 100) : 0;
+    state.attempts = state.attempts || [];
+    state.attempts.unshift({
+      student: activeUser.name,
+      pack: state.activePack.toUpperCase(),
+      submittedAt: now(),
+      score: s.score,
+      resolved: s.resolved,
+      accuracy
+    });
+  }
+  saveState();
+  renderAll();
+}
+
+function toggleGradeRelease() {
+  if (!isInstructor()) return;
+  state.exam.gradesReleased = !state.exam.gradesReleased;
   saveState();
   renderAll();
 }
@@ -254,8 +326,10 @@ function bindInputs() {
   document.getElementById("filter-search").addEventListener("input", renderIncidentTable);
   document.getElementById("load-pack").addEventListener("click", () => loadScenarioPack(document.getElementById("scenario-pack").value));
   document.getElementById("export-report").addEventListener("click", exportReportCsv);
+  document.getElementById("export-pdf").addEventListener("click", exportReportPdf);
   document.getElementById("start-exam").addEventListener("click", () => { if (!isInstructor()) return; startExam(Number(document.getElementById("exam-minutes").value || 30)); });
   document.getElementById("submit-exam").addEventListener("click", submitExamForActiveUser);
+  document.getElementById("release-grades").addEventListener("click", toggleGradeRelease);
   document.getElementById("reset-lab").addEventListener("click", () => { state = structuredClone(defaultState); if (activeUser) upsertScorecard(activeUser.name, activeUser.role); saveState(); renderAll(); });
   document.getElementById("logout-btn").addEventListener("click", () => { activeUser = null; saveActiveUser(); setAppVisibility(); });
   document.getElementById("campaign-form").addEventListener("submit", (e) => {
@@ -279,6 +353,8 @@ function bindInputs() {
 function renderAll() {
   if (!activeUser) return;
   document.getElementById("scenario-pack").value = state.activePack;
+  document.getElementById("release-grades").textContent = state.exam.gradesReleased ? "Hide Grades" : "Release Grades";
+  document.getElementById("release-grades").disabled = !isInstructor();
   renderMetrics();
   renderIncidentTable();
   renderIncidentDetail();
