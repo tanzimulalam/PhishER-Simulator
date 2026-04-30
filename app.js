@@ -1,4 +1,4 @@
-const STORE = "phisher-enterprise-v5";
+const STORE = "phisher-enterprise-v6";
 const SHIFT_SECONDS = 30 * 60;
 const TABS = ["preview", "headers", "auth", "links", "attachments"];
 const THREAT_DOMAINS = [
@@ -15,11 +15,21 @@ const CLEAN_URLS = [
   "https://google.com",
   "https://academy.local/intranet"
 ];
+const USER_PROFILES = {
+  "Maya Torres (CFO)": { department: "Finance", riskScore: 94 },
+  "Rafi Islam (IT Admin)": { department: "IT", riskScore: 71 },
+  "Nina Patel (Sales Intern)": { department: "Sales", riskScore: 67 },
+  "Liam Chowdhury (Security Analyst)": { department: "SOC", riskScore: 48 },
+  "Sadia Rahman (HR Lead)": { department: "HR", riskScore: 38 },
+  "Omar Khan (Finance Manager)": { department: "Finance", riskScore: 86 },
+  "Jui Sarker (Operations)": { department: "Operations", riskScore: 52 }
+};
 
 let state = load();
 let selected = state.incidents[0]?.id || null;
 let answerKey = false;
 let shiftTimer = null;
+let currentView = "inbox";
 
 function load() {
   const raw = localStorage.getItem(STORE);
@@ -56,8 +66,15 @@ function normalizeIncident(i) {
     noteDraft: i.noteDraft || "",
     discussion: i.discussion || [],
     attachments: i.attachments || [],
-    extractedQrUrl: i.extractedQrUrl || ""
+    extractedQrUrl: i.extractedQrUrl || "",
+    expectedDisposition: i.expectedDisposition || i.phishml,
+    reporterProfile: i.reporterProfile || inferReporterProfile(i.reporter)
   };
+}
+
+function inferReporterProfile(name) {
+  if (USER_PROFILES[name]) return name;
+  return "Liam Chowdhury (Security Analyst)";
 }
 
 function now() {
@@ -73,7 +90,7 @@ function auth(malicious, idx) {
     return {
       spf: `spf=fail smtp.mailfrom=mail-${idx}.secure-alert.net`,
       dkim: `dkim=fail header.d=secure-alert${idx}.net`,
-      dmarc: `dmarc=fail p=reject`
+      dmarc: "dmarc=fail p=reject"
     };
   }
   return {
@@ -111,8 +128,17 @@ function rawHeaders(from, reply, authObj, idx) {
     `Authentication-Results: ${authObj.spf}; ${authObj.dkim}; ${authObj.dmarc}`,
     `Message-ID: <${idx}.${Date.now()}@mail-gateway.net>`,
     `MIME-Version: 1.0`,
-    `Content-Type: text/html; charset=UTF-8`
+    "Content-Type: text/html; charset=UTF-8"
   ].join("\n");
+}
+
+function pickReporter(idx, targetRisk = "mixed") {
+  const names = Object.keys(USER_PROFILES);
+  if (targetRisk === "high") {
+    const high = names.filter((n) => USER_PROFILES[n].department === "Finance");
+    return high[idx % high.length];
+  }
+  return names[idx % names.length];
 }
 
 function generateIncidentByType(type, idx) {
@@ -132,13 +158,16 @@ function generateIncidentByType(type, idx) {
     const from = "CEO Office <ceo@academy-leadership.com>";
     const reply = `payment-ops${idx}@academy-wire-safe.net`;
     const a = auth(true, idx);
+    const reporter = pickReporter(idx, "high");
     return normalizeIncident({
       ...base,
       category: "CEO Fraud",
       priority: "critical",
-      reporter: `finance${idx % 8}@academy.local`,
+      reporter,
+      reporterProfile: reporter,
       subject: `Confidential Wire Request ${idx}`,
       phishml: "threat",
+      expectedDisposition: "threat",
       phishmlScore: rand(88, 99),
       from,
       replyTo: reply,
@@ -154,13 +183,16 @@ function generateIncidentByType(type, idx) {
     const from = `Identity Alerts <no-reply@id-prompt${idx}.com>`;
     const reply = `helpdesk@id-prompt${idx}.com`;
     const a = auth(true, idx);
+    const reporter = pickReporter(idx);
     return normalizeIncident({
       ...base,
       category: "MFA Fatigue",
       priority: "high",
-      reporter: `employee${idx % 17}@academy.local`,
+      reporter,
+      reporterProfile: reporter,
       subject: `Repeated MFA Prompt Alert ${idx}`,
       phishml: "spam",
+      expectedDisposition: "threat",
       phishmlScore: rand(55, 79),
       from,
       replyTo: reply,
@@ -176,13 +208,16 @@ function generateIncidentByType(type, idx) {
     const from = `IT Password Reset <password-reset${idx}@academy-support-help.com>`;
     const reply = `reset@academy-support-help.com`;
     const a = auth(true, idx);
+    const reporter = pickReporter(idx);
     return normalizeIncident({
       ...base,
       category: "IT Password Reset",
       priority: "medium",
-      reporter: `staff${idx % 22}@academy.local`,
+      reporter,
+      reporterProfile: reporter,
       subject: `Password Reset Confirmation ${idx}`,
       phishml: "spam",
+      expectedDisposition: "spam",
       phishmlScore: rand(45, 74),
       from,
       replyTo: reply,
@@ -197,13 +232,16 @@ function generateIncidentByType(type, idx) {
   const from = "HR Newsletter <hr-news@academy.local>";
   const reply = "hr-news@academy.local";
   const a = auth(false, idx);
+  const reporter = pickReporter(idx);
   return normalizeIncident({
     ...base,
     category: "Clean Newsletter",
     priority: "low",
-    reporter: `member${idx % 16}@academy.local`,
+    reporter,
+    reporterProfile: reporter,
     subject: `HR Monthly Newsletter ${idx}`,
     phishml: "clean",
+    expectedDisposition: "clean",
     phishmlScore: rand(5, 30),
     from,
     replyTo: reply,
@@ -232,6 +270,7 @@ function generateQuishingIncidents(total) {
     const reply = `security${idx}@academy-ithelp.com`;
     const a = auth(true, idx);
     const url = THREAT_DOMAINS[i % THREAT_DOMAINS.length];
+    const reporter = pickReporter(idx, "high");
     out.push(normalizeIncident({
       id,
       icon: "▣",
@@ -240,9 +279,11 @@ function generateQuishingIncidents(total) {
       room: "inbox",
       category: "Quishing",
       priority: "high",
-      reporter: `user${i}@academy.local`,
+      reporter,
+      reporterProfile: reporter,
       subject: `MFA Re-Enrollment Required (QR) Q${i}`,
       phishml: "threat",
+      expectedDisposition: "threat",
       phishmlScore: rand(76, 98),
       from,
       replyTo: reply,
@@ -285,8 +326,7 @@ function isLocked() {
 }
 
 function getDomain(link) {
-  const normalized = link.replace(/^hxxps?:\/\//, "").replace(/^https?:\/\//, "").replace(/\[\.\]/g, ".").split("/")[0];
-  return normalized;
+  return link.replace(/^hxxps?:\/\//, "").replace(/^https?:\/\//, "").replace(/\[\.\]/g, ".").split("/")[0];
 }
 
 function filtered() {
@@ -313,19 +353,41 @@ function appendLog(i, icon, text, actor = "system") {
   i.discussion.push({ ts: now(), icon, text, actor });
 }
 
+function pastReportCount(name) {
+  return state.incidents.filter((i) => i.reporter === name).length;
+}
+
+function riskClass(score) {
+  if (score >= 90) return "risk-critical";
+  if (score >= 80) return "risk-high";
+  return "";
+}
+
 function renderRows() {
   const tbody = document.getElementById("incident-rows");
-  tbody.innerHTML = filtered().map((i) => `
-    <tr class="incident-row ${i.id === selected ? "active" : ""}" data-id="${i.id}">
-      <td>${i.icon}</td>
-      <td>${i.priority.toUpperCase()}</td>
-      <td>${i.reporter}</td>
-      <td>${i.subject}</td>
-      <td><span class="pml ${pmlClass(i.phishml)}">PML:${i.phishml.toUpperCase()}</span></td>
-      <td>${i.status.replaceAll("_", " ").toUpperCase()}</td>
-      <td>${i.date}</td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = filtered().map((i) => {
+    const profile = USER_PROFILES[i.reporterProfile] || USER_PROFILES[inferReporterProfile(i.reporter)];
+    const scoreClass = riskClass(profile.riskScore);
+    return `
+      <tr class="incident-row ${i.id === selected ? "active" : ""}" data-id="${i.id}">
+        <td>${i.icon}</td>
+        <td>${i.priority.toUpperCase()}</td>
+        <td class="reporter-cell">
+          <span class="reporter-tag">${i.reporter}</span>
+          <div class="reporter-tip">
+            <div><strong>Name:</strong> ${i.reporter}</div>
+            <div><strong>Department:</strong> ${profile.department}</div>
+            <div><strong>Risk Score:</strong> <span class="${scoreClass}">${profile.riskScore}</span></div>
+            <div><strong>Past Reports:</strong> ${pastReportCount(i.reporter)}</div>
+          </div>
+        </td>
+        <td>${i.subject}</td>
+        <td><span class="pml ${pmlClass(i.phishml)}">PML:${i.phishml.toUpperCase()}</span></td>
+        <td>${i.status.replaceAll("_", " ").toUpperCase()}</td>
+        <td>${i.date}</td>
+      </tr>
+    `;
+  }).join("");
   tbody.querySelectorAll(".incident-row").forEach((r) => r.addEventListener("click", () => {
     if (isLocked()) return;
     selected = r.dataset.id;
@@ -402,6 +464,8 @@ function renderTriage() {
       <button id="resolve-btn" aria-label="Resolve incident">Resolve</button>
       <button id="tag-btn" aria-label="Add threat tag">Add Tag</button>
       <button id="phishrip-btn" aria-label="Run PhishRIP simulation" ${i.phishml !== "threat" ? "disabled" : ""}>Run PhishRIP</button>
+      <button id="zap-btn" aria-label="Run zero-hour auto purge" ${i.phishml !== "threat" ? "disabled" : ""}>Run ZAP</button>
+      <button id="phishflip-btn" aria-label="Convert threat into simulation" ${i.phishml !== "threat" ? "disabled" : ""}>PhishFlip</button>
       <button id="block-btn" aria-label="Block sender domain">Block</button>
     </div>
     <label>Analyst Notes (Auto-save)
@@ -435,6 +499,8 @@ function renderTriage() {
   });
   pane.querySelector("#block-btn").addEventListener("click", () => clickAction(i, "⛔", "Sender domain blocked."));
   pane.querySelector("#phishrip-btn").addEventListener("click", () => runPhishRip(i));
+  pane.querySelector("#zap-btn").addEventListener("click", () => runZap(i));
+  pane.querySelector("#phishflip-btn").addEventListener("click", () => runPhishFlip(i));
 
   pane.querySelectorAll(".urlscan-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -472,7 +538,7 @@ function clickAction(i, icon, text) {
   renderAll();
 }
 
-function runPhishRip(i) {
+function runPhishRIPLike(messageBuilder, i, icon, doneMessage) {
   if (isLocked()) return;
   const modal = document.getElementById("phishrip-modal");
   const bar = document.getElementById("phishrip-bar");
@@ -480,19 +546,48 @@ function runPhishRip(i) {
   modal.classList.remove("hidden");
   let pct = 0;
   bar.style.width = "0%";
-  txt.textContent = "Scanning 5,000 mailboxes...";
+  txt.textContent = messageBuilder("start");
   const timer = setInterval(() => {
     pct += 10;
     bar.style.width = `${pct}%`;
     if (pct >= 100) {
       clearInterval(timer);
-      const ripped = rand(3, 48);
-      txt.textContent = `Scan complete. ${ripped} identical threats ripped (quarantined).`;
-      appendLog(i, "🧹", `PhishRIP completed. ${ripped} threats quarantined.`, "system");
+      txt.textContent = messageBuilder("end");
+      appendLog(i, icon, doneMessage, "system");
       save();
       renderTriage();
     }
   }, 180);
+}
+
+function runPhishRip(i) {
+  const ripped = rand(3, 48);
+  runPhishRIPLike(
+    (phase) => (phase === "start" ? "Scanning 5,000 mailboxes..." : `Scan complete. ${ripped} identical threats ripped (quarantined).`),
+    i,
+    "🧹",
+    `PhishRIP completed. ${ripped} identical threats quarantined.`
+  );
+}
+
+function runZap(i) {
+  const domain = getDomain(i.links[0] || i.replyTo);
+  const removed = rand(7, 110);
+  runPhishRIPLike(
+    (phase) => (phase === "start" ? `ZAP scanning sender domain ${domain} across tenant...` : `ZAP complete. ${removed} messages purged for domain ${domain}.`),
+    i,
+    "⚡",
+    `ZAP executed. Proactive purge removed ${removed} messages from sender domain ${domain}.`
+  );
+}
+
+function runPhishFlip(i) {
+  if (isLocked() || i.phishml !== "threat") return;
+  appendLog(i, "🔄", "Threat sanitized. Training campaign live.", "system");
+  if (!i.tags.includes("PhishFlip")) i.tags.push("PhishFlip");
+  save();
+  renderTriage();
+  renderAnalytics();
 }
 
 function runDetonation(i) {
@@ -519,6 +614,7 @@ function runDetonation(i) {
       clearInterval(timer);
       appendLog(i, "💣", `Detonation completed for ${file.name}. Verdict: malicious behavior observed.`, "sandbox");
       save();
+      renderAnalytics();
     }
   }, 380);
 }
@@ -534,6 +630,64 @@ function classifySelected(label) {
   appendLog(i, "⌨", `Shortcut classification set to ${label.toUpperCase()}.`, "analyst");
   save();
   renderAll();
+}
+
+function metricBar(label, value, total, color = "#1d4ed8") {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return `
+    <div class="metric-row">
+      <span>${label}: ${value} (${pct}%)</span>
+      <div class="metric-bar"><div class="metric-fill" style="width:${pct}%; background:${color};"></div></div>
+    </div>
+  `;
+}
+
+function renderAnalytics() {
+  const host = document.getElementById("analytics-content");
+  if (!host) return;
+  const all = state.incidents;
+  const resolved = all.filter((i) => i.status === "resolved").length;
+  const pending = all.length - resolved;
+  const threat = all.filter((i) => i.phishml === "threat").length;
+  const spam = all.filter((i) => i.phishml === "spam").length;
+  const clean = all.filter((i) => i.phishml === "clean").length;
+  const correct = all.filter((i) => i.phishml === i.expectedDisposition).length;
+  const incorrect = all.length - correct;
+
+  host.innerHTML = `
+    <div class="dash-grid">
+      <article class="dash-card">
+        <h3>Incident Status</h3>
+        ${metricBar("Resolved", resolved, all.length, "#059669")}
+        ${metricBar("Pending", pending, all.length, "#dc2626")}
+      </article>
+      <article class="dash-card">
+        <h3>Disposition Distribution</h3>
+        ${metricBar("Threat", threat, all.length, "#dc2626")}
+        ${metricBar("Spam", spam, all.length, "#d4a017")}
+        ${metricBar("Clean", clean, all.length, "#059669")}
+      </article>
+      <article class="dash-card">
+        <h3>Student Accuracy</h3>
+        ${metricBar("Correct", correct, all.length, "#2563eb")}
+        ${metricBar("Incorrect", incorrect, all.length, "#f97316")}
+      </article>
+    </div>
+  `;
+}
+
+function switchView(view) {
+  currentView = view;
+  const inbox = document.getElementById("inbox-view");
+  const dash = document.getElementById("dashboard-view");
+  const inboxBtn = document.getElementById("view-inbox");
+  const dashBtn = document.getElementById("view-dashboard");
+  const showInbox = view === "inbox";
+  inbox.classList.toggle("hidden", !showInbox);
+  dash.classList.toggle("hidden", showInbox);
+  inboxBtn.classList.toggle("active", showInbox);
+  dashBtn.classList.toggle("active", !showInbox);
+  if (!showInbox) renderAnalytics();
 }
 
 function updateTimer() {
@@ -555,6 +709,8 @@ function bind() {
   document.getElementById("status-filter").addEventListener("change", (e) => { state.filters.status = e.target.value; save(); renderRows(); });
   document.getElementById("search-filter").addEventListener("input", (e) => { state.filters.query = e.target.value; save(); renderRows(); });
   document.getElementById("answer-key-toggle").addEventListener("click", () => { answerKey = !answerKey; renderTriage(); });
+  document.getElementById("view-inbox").addEventListener("click", () => switchView("inbox"));
+  document.getElementById("view-dashboard").addEventListener("click", () => switchView("dashboard"));
   document.getElementById("reset-sim").addEventListener("click", () => {
     state = freshState();
     selected = state.incidents[0]?.id || null;
@@ -585,6 +741,8 @@ function renderAll() {
   hydrate();
   renderRows();
   renderTriage();
+  renderAnalytics();
+  switchView(currentView);
   updateTimer();
 }
 

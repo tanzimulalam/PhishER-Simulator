@@ -9,6 +9,10 @@
 <body>
   <header class="topbar">
     <div class="brand">KnowBe4 PhishER - Enterprise SOC</div>
+    <nav class="top-nav" aria-label="Primary views">
+      <button id="view-inbox" class="view-btn active" aria-label="Open inbox view">Inbox</button>
+      <button id="view-dashboard" class="view-btn" aria-label="Open dashboard view">Dashboard</button>
+    </nav>
     <div class="top-controls">
       <span id="shift-timer" class="timer" aria-label="SOC shift countdown">30:00</span>
       <button id="answer-key-toggle" aria-label="Toggle instructor answer key">Instructor Key</button>
@@ -16,7 +20,7 @@
     </div>
   </header>
 
-  <main class="layout" aria-label="Phishing triage workspace">
+  <main id="inbox-view" class="layout" aria-label="Phishing triage workspace">
     <section class="pane pane-left" aria-label="Rooms and filters">
       <h2>Rooms / Filters</h2>
       <label>Room
@@ -79,6 +83,11 @@
       <div id="triage-pane"></div>
     </aside>
   </main>
+
+  <section id="dashboard-view" class="dashboard hidden" aria-label="Global analytics dashboard">
+    <h2>Global Analytics</h2>
+    <div id="analytics-content"></div>
+  </section>
 
   <div id="phishrip-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="PhishRIP simulation">
     <div class="modal-card">
