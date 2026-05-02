@@ -19,6 +19,7 @@ body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--
   justify-content: space-between;
   padding: 0 12px;
   border-bottom: 2px solid #00152d;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.15);
 }
 
 .brand { font-weight: 800; font-size: 20px; letter-spacing: 0.4px; font-family: "Segoe UI", "Inter", Arial, sans-serif; }
@@ -346,7 +347,288 @@ body.high-contrast .toast {
   border: 3px solid #FFD700;
 }
 
+.playbook-shell {
+  min-height: calc(100vh - 54px);
+  padding: 16px;
+  background: linear-gradient(180deg, #f1f5f9 0%, var(--bg) 40%);
+  overflow: auto;
+}
+.playbook-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.playbook-hero {
+  margin-bottom: 20px;
+  padding: 20px 22px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #002244 0%, #0c4a6e 100%);
+  color: #fff;
+  border: 1px solid #0ea5e9;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+}
+.playbook-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #7dd3fc;
+  font-weight: 700;
+}
+.playbook-hero h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+}
+.playbook-lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.95;
+  max-width: 720px;
+}
+.playbook-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.playbook-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 2px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+.playbook-tab:hover {
+  border-color: #0ea5e9;
+  color: #0c4a6e;
+}
+.playbook-tab.active {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+.playbook-panel:not([hidden]) {
+  animation: playbookFade 0.25s ease;
+}
+@keyframes playbookFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.playbook-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.playbook-card-wide {
+  grid-column: 1 / -1;
+}
+.playbook-card {
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+.playbook-card h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+}
+.playbook-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+.playbook-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+.playbook-steps li { margin-bottom: 6px; }
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+.playbook-more {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px dashed #94a3b8;
+  background: #fff;
+}
+.playbook-more summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #0f172a;
+}
+.playbook-intro {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+  margin: 0 0 16px;
+}
+.auth-compare {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.auth-pill {
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+}
+.auth-pill h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--navy);
+}
+.auth-pill p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475569;
+}
+.auth-result {
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.auth-result.fail {
+  background: #fef2f2;
+  border-left: 3px solid var(--threat);
+}
+.auth-result.ok {
+  background: #ecfdf5;
+  border-left: 3px solid var(--clean);
+}
+.disp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.disp-card {
+  border-radius: 10px;
+  padding: 14px;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+}
+.disp-card h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.disp-threat { border-left: 4px solid var(--threat); }
+.disp-spam { border-left: 4px solid var(--spam); }
+.disp-clean { border-left: 4px solid var(--clean); }
+.disp-card ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475569;
+}
+.action-dl {
+  margin: 0;
+  font-size: 13px;
+}
+.action-dl dt {
+  font-weight: 700;
+  color: var(--navy);
+  margin-top: 12px;
+}
+.action-dl dt:first-child { margin-top: 0; }
+.action-dl dd {
+  margin: 4px 0 0;
+  color: #475569;
+  line-height: 1.5;
+}
+.sim-tips {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #334155;
+}
+.sim-tips li { margin-bottom: 8px; }
+.playbook-footer-note {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  font-size: 12px;
+  color: #92400e;
+}
+.playbook-cta {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+.btn-primary {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 2px solid #0ea5e9;
+  background: var(--navy);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #0c4a6e;
+}
+
+body.high-contrast .playbook-shell {
+  background: #000;
+}
+body.high-contrast .playbook-hero {
+  border-color: #FFD700;
+  background: #000;
+}
+body.high-contrast .playbook-card,
+body.high-contrast .auth-pill,
+body.high-contrast .disp-card {
+  background: #000;
+  border-color: #FFD700;
+}
+body.high-contrast .playbook-tab.active {
+  background: #FFD700;
+  color: #000;
+}
+body.high-contrast .playbook-tab:not(.active) {
+  background: #000;
+  color: #FFD700;
+  border-color: #FFD700;
+}
+body.high-contrast kbd {
+  background: #000;
+  color: #FFD700;
+  border-color: #FFD700;
+}
+
 @media (max-width: 1400px) {
   .layout { grid-template-columns: 1fr; height: auto; }
   .dash-grid { grid-template-columns: 1fr; }
+  .playbook-grid { grid-template-columns: 1fr; }
+  .auth-compare { grid-template-columns: 1fr; }
+  .disp-grid { grid-template-columns: 1fr; }
 }

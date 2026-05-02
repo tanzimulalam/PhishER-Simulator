@@ -807,16 +807,37 @@ function renderAnalytics() {
 function switchView(view) {
   currentView = view;
   const inbox = document.getElementById("inbox-view");
+  const playbook = document.getElementById("playbook-view");
   const dash = document.getElementById("dashboard-view");
   const inboxBtn = document.getElementById("view-inbox");
+  const playbookBtn = document.getElementById("view-playbook");
   const dashBtn = document.getElementById("view-dashboard");
-  const showInbox = view === "inbox";
-  inbox.classList.toggle("hidden", !showInbox);
-  dash.classList.toggle("hidden", showInbox);
-  inboxBtn.classList.toggle("active", showInbox);
-  dashBtn.classList.toggle("active", !showInbox);
-  if (!showInbox) renderAnalytics();
+  inbox.classList.toggle("hidden", view !== "inbox");
+  playbook.classList.toggle("hidden", view !== "playbook");
+  dash.classList.toggle("hidden", view !== "dashboard");
+  inboxBtn.classList.toggle("active", view === "inbox");
+  playbookBtn.classList.toggle("active", view === "playbook");
+  dashBtn.classList.toggle("active", view === "dashboard");
+  if (view === "dashboard") renderAnalytics();
   save();
+}
+
+function initPlaybookTabs() {
+  const tabs = document.querySelectorAll(".playbook-tab");
+  const panels = document.querySelectorAll(".playbook-panel");
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const id = tab.dataset.playbookTab;
+      tabs.forEach((t) => {
+        t.classList.toggle("active", t === tab);
+        t.setAttribute("aria-selected", t === tab ? "true" : "false");
+      });
+      panels.forEach((p) => {
+        const match = p.id === `playbook-panel-${id}`;
+        p.hidden = !match;
+      });
+    });
+  });
 }
 
 function updateTimer() {
@@ -849,7 +870,11 @@ function bind() {
   document.getElementById("search-filter").addEventListener("input", (e) => { state.filters.query = e.target.value; save(); renderRows(); });
   document.getElementById("answer-key-toggle").addEventListener("click", () => { answerKey = !answerKey; renderTriage(); });
   document.getElementById("view-inbox").addEventListener("click", () => switchView("inbox"));
+  document.getElementById("view-playbook").addEventListener("click", () => switchView("playbook"));
   document.getElementById("view-dashboard").addEventListener("click", () => switchView("dashboard"));
+  const playbookGoInbox = document.getElementById("playbook-go-inbox");
+  if (playbookGoInbox) playbookGoInbox.addEventListener("click", () => switchView("inbox"));
+  initPlaybookTabs();
   document.getElementById("contrast-toggle").addEventListener("click", () => {
     state.highContrast = !state.highContrast;
     document.body.classList.toggle("high-contrast", state.highContrast);

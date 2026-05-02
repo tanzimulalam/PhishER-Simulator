@@ -11,6 +11,7 @@
     <div class="brand"><span class="brand-mark">PhishER</span> Simulator</div>
     <nav class="top-nav" aria-label="Primary views">
       <button id="view-inbox" class="view-btn active" aria-label="Open inbox view">Inbox</button>
+      <button id="view-playbook" class="view-btn" aria-label="Open SOC triage playbook">Playbook</button>
       <button id="view-dashboard" class="view-btn" aria-label="Open dashboard view">Dashboard</button>
       <button id="help-toggle" aria-label="Open quick start tutorial">Quick Start</button>
     </nav>
@@ -86,6 +87,163 @@
       <div id="triage-pane"></div>
     </aside>
   </main>
+
+  <section id="playbook-view" class="playbook-shell hidden" aria-label="SOC triage playbook">
+    <div class="playbook-inner">
+      <header class="playbook-hero">
+        <p class="playbook-kicker">Learn while you triage</p>
+        <h2>SOC Phish Triage Playbook</h2>
+        <p class="playbook-lead">Step-by-step guidance aligned with this simulator: intake → investigate → justify → act → resolve.</p>
+      </header>
+
+      <div class="playbook-tabs" role="tablist" aria-label="Playbook sections">
+        <button type="button" class="playbook-tab active" role="tab" aria-selected="true" data-playbook-tab="workflow">Triage workflow</button>
+        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="auth">SPF · DKIM · DMARC</button>
+        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="dispositions">Threat · Spam · Clean</button>
+        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="actions">Response actions</button>
+        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="simulator">Using this sim</button>
+      </div>
+
+      <div id="playbook-panel-workflow" class="playbook-panel" role="tabpanel">
+        <div class="playbook-grid">
+          <article class="playbook-card">
+            <h3><span class="playbook-step">1</span> Intake</h3>
+            <ol class="playbook-steps">
+              <li>Open <strong>Inbox</strong>; sort by priority or PhishML (Threat first).</li>
+              <li>Note reporter context (hover name for risk profile).</li>
+              <li>Select a row — details load in the right pane.</li>
+            </ol>
+          </article>
+          <article class="playbook-card">
+            <h3><span class="playbook-step">2</span> Investigate</h3>
+            <ol class="playbook-steps">
+              <li><strong>Preview</strong> — urgency, impersonation, odd tone.</li>
+              <li><strong>Headers</strong> — From vs Reply-To mismatch?</li>
+              <li><strong>Auth</strong> — SPF/DKIM/DMARC (see next tab).</li>
+              <li><strong>Links</strong> — visible text vs real URL (masked links).</li>
+              <li><strong>Attachments</strong> — risky types; detonate in sandbox if unsure.</li>
+            </ol>
+          </article>
+          <article class="playbook-card playbook-card-wide">
+            <h3><span class="playbook-step">3</span> Decide & document</h3>
+            <ol class="playbook-steps">
+              <li>Choose <strong>Threat</strong>, <strong>Spam</strong>, or <strong>Clean</strong> (or shortcuts <kbd>T</kbd> <kbd>S</kbd> <kbd>C</kbd>).</li>
+              <li>Pick a <strong>reason code</strong> that matches evidence.</li>
+              <li>Write analyst notes (min length required before <strong>Resolve</strong>).</li>
+              <li>Add OSINT/sandbox clips via URLScan or Detonate — they append to notes.</li>
+            </ol>
+          </article>
+          <article class="playbook-card">
+            <h3><span class="playbook-step">4</span> Act & close</h3>
+            <ol class="playbook-steps">
+              <li><strong>In Review</strong> while analyzing; <strong>Resolve</strong> when disposition + notes are complete.</li>
+              <li>For confirmed malicious mail: <strong>PhishRIP</strong> (same message) or <strong>ZAP</strong> (sender domain).</li>
+              <li>Export <strong>Shift Report</strong> from Dashboard when the exercise ends.</li>
+            </ol>
+          </article>
+        </div>
+        <details class="playbook-more">
+          <summary>Why this order?</summary>
+          <p>Fast triage balances speed and accuracy: prioritize dangerous mail, verify with headers and links before clicking anything real-world, then record decisions so another analyst could continue the case.</p>
+        </details>
+      </div>
+
+      <div id="playbook-panel-auth" class="playbook-panel" role="tabpanel" hidden>
+        <p class="playbook-intro">Email authentication tells you whether the sending infrastructure is allowed to send as that domain — not whether the <em>content</em> is safe.</p>
+        <div class="auth-compare">
+          <article class="auth-pill">
+            <h4>SPF</h4>
+            <p><strong>Sender Policy Framework.</strong> Lists which servers may send mail for a domain (DNS TXT).</p>
+            <p class="auth-result fail"><code>fail</code> — sending IP is not authorized → spoofing risk.</p>
+            <p class="auth-result ok"><code>pass</code> — sending host is allowed → attacker may own a lookalike domain; still analyze body/links.</p>
+          </article>
+          <article class="auth-pill">
+            <h4>DKIM</h4>
+            <p><strong>DomainKeys Identified Mail.</strong> Cryptographic signature proves the message was not altered in transit for the signing domain.</p>
+            <p class="auth-result fail"><code>fail</code> — signature mismatch → tampering or wrong key.</p>
+            <p class="auth-result ok"><code>pass</code> — signed consistently → still verify it is <em>your</em> trusted domain, not a typosquat.</p>
+          </article>
+          <article class="auth-pill">
+            <h4>DMARC</h4>
+            <p><strong>Domain-based Message Authentication.</strong> Tells receivers what to do when SPF/DKIM do not align (policy).</p>
+            <p class="auth-result fail"><code>fail</code> — policy violation / alignment failure → strong spoofing signal.</p>
+            <p class="auth-result ok"><code>pass</code> — aligned with policy → combine with content review.</p>
+          </article>
+        </div>
+        <details class="playbook-more">
+          <summary>Quick mental model</summary>
+          <ul>
+            <li><strong>SPF</strong> = “Is this mail server allowed to send as this domain?”</li>
+            <li><strong>DKIM</strong> = “Does this message cryptographically match the sender domain?”</li>
+            <li><strong>DMARC</strong> = “What should we do when SPF/DKIM do not align?”</li>
+          </ul>
+        </details>
+      </div>
+
+      <div id="playbook-panel-dispositions" class="playbook-panel" role="tabpanel" hidden>
+        <div class="disp-grid">
+          <article class="disp-card disp-threat">
+            <h4>Threat</h4>
+            <p>Malicious intent: credential theft, malware, fraud, or confirmed phishing infrastructure.</p>
+            <ul>
+              <li>Use reason codes: Malicious Link, Malicious Attachment, Domain Spoofing, Social Engineering, etc.</li>
+              <li>Run <strong>PhishRIP</strong> / <strong>ZAP</strong> when policy allows; document in notes.</li>
+              <li>Consider <strong>PhishFlip</strong> for training campaigns after containment.</li>
+            </ul>
+          </article>
+          <article class="disp-card disp-spam">
+            <h4>Spam</h4>
+            <p>Unwanted or bulk mail — not necessarily malware, but abusive or misleading.</p>
+            <ul>
+              <li>Often graymail, excessive marketing, or low-confidence phishing.</li>
+              <li>Reason codes may still apply (Social Engineering, Authentication Failure).</li>
+              <li>Escalate to Threat if indicators worsen.</li>
+            </ul>
+          </article>
+          <article class="disp-card disp-clean">
+            <h4>Clean</h4>
+            <p>Legitimate internal or expected external mail after verification.</p>
+            <ul>
+              <li>Known Safe Sender / Internal Communication reason codes.</li>
+              <li>Resolve with clear rationale so reporters trust the process.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+
+      <div id="playbook-panel-actions" class="playbook-panel" role="tabpanel" hidden>
+        <dl class="action-dl">
+          <dt>Assign / In Review / Resolve</dt>
+          <dd>Lifecycle: received → in review → resolved. Resolve requires reason + sufficient notes.</dd>
+          <dt>PhishRIP</dt>
+          <dd>Simulates removing <strong>matching message instances</strong> across the tenant.</dd>
+          <dt>ZAP</dt>
+          <dd>Simulates purging mail from the <strong>same sender domain</strong> organization-wide.</dd>
+          <dt>PhishFlip</dt>
+          <dd>Turns a contained threat into a <strong>training simulation</strong> narrative.</dd>
+          <dt>URLScan</dt>
+          <dd>Pivots to domain search — never substitute for clicking unknown links in production.</dd>
+          <dt>Detonate</dt>
+          <dd>Sandbox behavior check for attachments; evidence clips notes automatically.</dd>
+        </dl>
+      </div>
+
+      <div id="playbook-panel-simulator" class="playbook-panel" role="tabpanel" hidden>
+        <ul class="sim-tips">
+          <li><strong>Instructor Key</strong> — reveals debrief hints in Headers/Auth for class review.</li>
+          <li><strong>Dashboard</strong> — accuracy and disposition mix; download Shift Report for submissions.</li>
+          <li><strong>Final 5</strong> — timer under 5 minutes injects surge traffic; stay calm and prioritize.</li>
+          <li><strong>High Contrast / Mute</strong> — accessibility; audio cues fire on resolve, detonation, surge.</li>
+          <li><strong>Reset Lab</strong> — clears saved state for the next cohort.</li>
+        </ul>
+        <p class="playbook-footer-note">Tip: Treat every incident like production — no clicking dangerous URLs outside controlled tooling.</p>
+      </div>
+
+      <div class="playbook-cta">
+        <button type="button" id="playbook-go-inbox" class="btn-primary">Open Inbox and practice</button>
+      </div>
+    </div>
+  </section>
 
   <section id="dashboard-view" class="dashboard hidden" aria-label="Global analytics dashboard">
     <h2>Global Analytics</h2>
