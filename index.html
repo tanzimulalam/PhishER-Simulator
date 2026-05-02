@@ -100,6 +100,7 @@
         <button type="button" class="playbook-tab active" role="tab" aria-selected="true" data-playbook-tab="workflow">Triage workflow</button>
         <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="auth">SPF · DKIM · DMARC</button>
         <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="dispositions">Threat · Spam · Clean</button>
+        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="recipes">Triage recipes</button>
         <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="actions">Response actions</button>
         <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="simulator">Using this sim</button>
       </div>
@@ -180,6 +181,48 @@
         </details>
       </div>
 
+      <div id="playbook-panel-recipes" class="playbook-panel" role="tabpanel" hidden>
+        <p class="playbook-intro">Use these like <strong>recipes</strong>: ingredients = evidence you collect; steps = order of operations. Names match buttons in the simulator.</p>
+
+        <article class="recipe-card">
+          <h4>Recipe: PhishRIP vs ZAP (Zero-hour Auto-Purge)</h4>
+          <p><strong>ZAP</strong> here means <em>proactive purge by sender domain</em> — same idea as “zero-hour” response: stop the blast radius early when the <strong>domain</strong> is the threat, not just one copy of the message.</p>
+          <ul class="recipe-steps">
+            <li><strong>PhishRIP</strong> — Remove <em>matching instances of this email</em> (same campaign / fingerprint) across mailboxes. Use when the message body or attachment hash is the smoking gun.</li>
+            <li><strong>ZAP</strong> — Purge or block mail from the <em>same malicious sender domain</em> more broadly. Use when the domain is attacker-controlled and many variants may exist.</li>
+            <li><strong>Rule of thumb:</strong> same template everywhere → PhishRIP first; poisoned domain still pumping mail → ZAP.</li>
+          </ul>
+        </article>
+
+        <article class="recipe-card">
+          <h4>Recipe: Likely malware / credential phishing (Threat)</h4>
+          <ol class="recipe-steps">
+            <li>Confirm classification: Threat + reason (e.g. Malicious Link, Domain Spoofing).</li>
+            <li>Evidence: paste OSINT / detonation lines into notes.</li>
+            <li>Contain: Run <strong>PhishRIP</strong> if policy matches; add <strong>ZAP</strong> if the domain is the root problem.</li>
+            <li>Resolve with ≥20 chars explaining why.</li>
+          </ol>
+        </article>
+
+        <article class="recipe-card">
+          <h4>Recipe: Probably unwanted but not malware (Spam)</h4>
+          <ol class="recipe-steps">
+            <li>Spam + reason (Social Engineering, Authentication Failure, etc.).</li>
+            <li>Block or tag per playbook; escalate to Threat if indicators worsen.</li>
+            <li>Resolve with coaching notes for the reporter if useful.</li>
+          </ol>
+        </article>
+
+        <article class="recipe-card">
+          <h4>Recipe: Verified legitimate (Clean)</h4>
+          <ol class="recipe-steps">
+            <li>Clean + Known Safe Sender / Internal Communication.</li>
+            <li>Headers + links align; no credential asks.</li>
+            <li>Resolve so the reporter gets closure.</li>
+          </ol>
+        </article>
+      </div>
+
       <div id="playbook-panel-dispositions" class="playbook-panel" role="tabpanel" hidden>
         <div class="disp-grid">
           <article class="disp-card disp-threat">
@@ -217,8 +260,8 @@
           <dd>Lifecycle: received → in review → resolved. Resolve requires reason + sufficient notes.</dd>
           <dt>PhishRIP</dt>
           <dd>Simulates removing <strong>matching message instances</strong> across the tenant.</dd>
-          <dt>ZAP</dt>
-          <dd>Simulates purging mail from the <strong>same sender domain</strong> organization-wide.</dd>
+          <dt>ZAP (Zero-hour Auto-Purge style)</dt>
+          <dd><strong>Why it exists:</strong> Some campaigns rotate subjects but reuse a bad domain. ZAP simulates <strong>organization-wide action against that sender domain</strong> — faster than remediating one message at a time. In this lab it complements PhishRIP (same message) vs domain-level cleanup.</dd>
           <dt>PhishFlip</dt>
           <dd>Turns a contained threat into a <strong>training simulation</strong> narrative.</dd>
           <dt>URLScan</dt>

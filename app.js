@@ -1,17 +1,21 @@
-const STORE = "phisher-enterprise-v7";
+const STORE = "phisher-enterprise-v8";
 const SHIFT_SECONDS = 30 * 60;
 const TABS = ["preview", "headers", "auth", "links", "attachments"];
+/** Training-safe destinations (RFC 2606 .invalid / .example) — realistic shape, not live phishing infrastructure */
 const THREAT_URLS = {
-  itSupport: "https://help-okta-auth.com",
-  office365: "https://com-verify.ru",
-  shipping: "https://shipping-tracker-update.com",
-  cfoWire: "https://sharepoint-docs-access.net",
-  knownKit: "https://microsoft-update.xyz"
+  itSupport: "https://signin.okta-verify.invalid/login",
+  office365: "https://office365-login.office-verify.invalid/common/oauth2",
+  shipping: "https://track.fedex-parcel.invalid/status",
+  cfoWire: "https://secure.sharepoint-wire.invalid/finance",
+  knownKit: "https://security-update.office365-kit.invalid/renew"
 };
+/** Legitimate destinations for clean scenarios (real vendor/homepages) */
 const CLEAN_URLS = [
-  "https://yourcompany.com",
-  "https://workday.com",
-  "https://zoom.us"
+  "https://www.microsoft.com",
+  "https://www.okta.com",
+  "https://www.docusign.com",
+  "https://www.zoom.us",
+  "https://www.workday.com"
 ];
 const USER_PROFILES = {
   "Maya Torres (CFO)": { department: "Finance", riskScore: 94 },
@@ -223,7 +227,7 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Urgent request from executive persona to complete same-day transfer.",
-      links: [makeLink("https://sharepoint.com/finance-docs", THREAT_URLS.cfoWire, "Impersonation domain tied to wire-fraud lures.")],
+      links: [makeLink("https://www.office.com/", THREAT_URLS.cfoWire, "Training: visible brand vs typosquat destination (.invalid).")],
       attachments: [makeAttachment("wire_statement", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -248,7 +252,7 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Unexpected multiple MFA prompts with urgent 'approve now' language.",
-      links: [makeLink("https://okta.com/security", THREAT_URLS.itSupport, "Typosquatting identity portal observed.")],
+      links: [makeLink("https://www.okta.com/", THREAT_URLS.itSupport, "Training: legitimate-looking label vs fake sign-in host.")],
       attachments: [makeAttachment("mfa_alert", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -273,7 +277,7 @@ function generateIncidentByType(type, idx) {
       from,
       replyTo: reply,
       preview: "Reset link expires in 5 minutes. Immediate action required.",
-      links: [makeLink("https://portal.office.com", idx % 4 === 0 ? THREAT_URLS.knownKit : THREAT_URLS.office365, "Credential-harvest destination with masked branding.")],
+      links: [makeLink("https://login.microsoftonline.com/", idx % 4 === 0 ? THREAT_URLS.knownKit : THREAT_URLS.office365, "Training: OAuth-looking lure — verify destination host.")],
       attachments: [makeAttachment("reset_notice", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -297,7 +301,7 @@ function generateIncidentByType(type, idx) {
     from,
     replyTo: reply,
     preview: "Internal HR updates and employee engagement announcements.",
-    links: [makeLink(CLEAN_URLS[idx % CLEAN_URLS.length], CLEAN_URLS[idx % CLEAN_URLS.length], "Known safe corporate domain.")],
+      links: [makeLink(CLEAN_URLS[idx % CLEAN_URLS.length], CLEAN_URLS[idx % CLEAN_URLS.length], "Real vendor homepage — label matches destination.")],
     attachments: [makeAttachment("newsletter", false)],
     auth: a,
     raw: rawHeaders(from, reply, a, idx),
@@ -339,7 +343,7 @@ function generateQuishingIncidents(total) {
       from,
       replyTo: reply,
       preview: "Scan QR code to restore MFA access.",
-      links: [makeLink("https://fedex.com/track", url, "New domain matching shipping pretext campaigns.")],
+      links: [makeLink("https://www.fedex.com/", url, "Training: carrier branding vs fake tracking host.")],
       attachments: [makeAttachment("mfa_qr", true)],
       auth: a,
       raw: rawHeaders(from, reply, a, idx),
@@ -469,9 +473,10 @@ function renderRows() {
 }
 
 function renderPreviewTab(i, mismatch) {
+  const qrPayload = i.qrData || (typeof i.links[0] === "object" ? i.links[0]?.destination : i.links[0]) || "";
   const qr = i.category === "Quishing" ? `
     <div class="qr-preview">
-      <img alt="QR phishing preview" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(i.qrData || i.links[0])}" />
+      <img alt="QR phishing preview" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrPayload)}" />
     </div>
   ` : "";
   return `<p>${i.preview}</p>${qr}${answerKey ? `<p class="${mismatch ? "warn" : "ok"}">Red Flag: ${i.redFlag}</p>` : ""}`;
@@ -479,6 +484,7 @@ function renderPreviewTab(i, mismatch) {
 
 function renderLinksTab(i) {
   return `
+    <p class="muted">Simulator uses real-looking labels; suspicious destinations use reserved <code>.invalid</code> domains for safe classroom practice.</p>
     ${i.links.map((l) => `
       <div class="link-row">
         <span class="mono"><strong>Visible Text:</strong> ${l.visibleText}<br><strong>Actual Destination:</strong> ${l.destination}</span>
@@ -500,6 +506,43 @@ function renderAttachmentsTab(i) {
     </table>
     <button id="detonate-btn" aria-label="Detonate selected file in sandbox">Detonate in Sandbox</button>
   `;
+}
+
+function updateResolveButton(i) {
+  const pane = document.getElementById("triage-pane");
+  if (!pane || selected !== i.id) return;
+  const btn = pane.querySelector("#resolve-btn");
+  if (!btn) return;
+  const noteLength = (i.noteDraft || "").trim().length;
+  const canResolve = i.status === "in_review" && Boolean(i.reasonCode) && noteLength >= 20;
+  btn.disabled = !canResolve;
+}
+
+/** Updates notes textarea in place so typing is not interrupted by full re-render */
+function patchNotesUI(i) {
+  const pane = document.getElementById("triage-pane");
+  if (!pane || selected !== i.id) {
+    renderTriage();
+    return;
+  }
+  const ta = pane.querySelector("#analyst-notes");
+  if (ta) {
+    const pos = typeof ta.selectionStart === "number" ? ta.selectionStart : null;
+    ta.value = i.noteDraft || "";
+    updateResolveButton(i);
+    if (pos !== null) {
+      const len = ta.value.length;
+      const at = Math.min(Math.max(pos, 0), len);
+      requestAnimationFrame(() => {
+        try {
+          ta.focus();
+          ta.setSelectionRange(at, at);
+        } catch (_) {}
+      });
+    }
+  } else {
+    renderTriage();
+  }
 }
 
 function renderTriage() {
@@ -562,7 +605,7 @@ function renderTriage() {
     <label>Analyst Notes (Auto-save)
       <textarea id="analyst-notes" aria-label="Analyst notes area" rows="5" ${locked ? "disabled" : ""}>${i.noteDraft || ""}</textarea>
     </label>
-    <div class="shortcut-legend"><strong>Shortcuts:</strong> T = Threat, S = Spam, C = Clean</div>
+    <div class="shortcut-legend"><strong>Shortcuts:</strong> T / S / C = Threat / Spam / Clean — disabled while cursor is in notes or other fields.</div>
     <div class="log">${i.discussion.slice().reverse().map((d) => `<div>${d.icon} ${d.ts} - ${d.text}</div>`).join("") || "No logs yet."}</div>
   `;
 
@@ -605,7 +648,7 @@ function renderTriage() {
       appendLog(i, "🔎", `Pivoted to URLScan search for ${domain}.`, "analyst");
       appendEvidenceClip(i, "Evidence: [OSINT Search Logged]");
       save();
-      renderTriage();
+      patchNotesUI(i);
     });
   });
 
@@ -627,12 +670,12 @@ function renderTriage() {
   notes.addEventListener("input", () => {
     i.noteDraft = notes.value;
     save();
-    renderTriage();
+    updateResolveButton(i);
   });
   pane.querySelector("#reason-code").addEventListener("change", (e) => {
     i.reasonCode = e.target.value;
     save();
-    renderTriage();
+    updateResolveButton(i);
   });
 }
 
@@ -729,7 +772,7 @@ function runDetonation(i) {
     `[${now()}] Verdict: MALICIOUS`
   ];
   const primaryLink = i.links?.[0]?.destination || "";
-  if (primaryLink.includes("microsoft-update.xyz")) {
+  if (primaryLink.includes("office365-kit.invalid")) {
     lines.splice(lines.length - 1, 0, `[${now()}] Matched known phishing kit: "PhishKit-V3-Office365"`);
   }
   out.textContent = "";
@@ -743,7 +786,7 @@ function runDetonation(i) {
       appendLog(i, "💣", `Detonation completed for ${file.name}. Verdict: malicious behavior observed.`, "sandbox");
       appendEvidenceClip(i, "Evidence: [Sandbox Detonation Performed]");
       save();
-      renderTriage();
+      patchNotesUI(i);
       renderAnalytics();
     }
   }, 380);
@@ -906,7 +949,11 @@ function bind() {
   document.getElementById("close-modal").addEventListener("click", () => document.getElementById("phishrip-modal").classList.add("hidden"));
   document.getElementById("close-detonate-modal").addEventListener("click", () => document.getElementById("detonate-modal").classList.add("hidden"));
   document.addEventListener("keydown", (e) => {
-    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    const el = e.target;
+    if (!el) return;
+    const tag = el.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+    if (el.isContentEditable) return;
     const k = e.key.toLowerCase();
     if (k === "t") classifySelected("threat");
     if (k === "s") classifySelected("spam");

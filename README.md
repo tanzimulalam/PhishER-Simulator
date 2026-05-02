@@ -5,7 +5,9 @@ A browser-based phishing incident response training platform for SOC classrooms,
 ## Features
 
 - Three-pane SOC interface: filters, inbox queue, and triage sidebar
-- **Playbook** tab: interactive triage guide (workflow, SPF/DKIM/DMARC, dispositions, actions)
+- **Playbook** tab: interactive triage guide (workflow, SPF/DKIM/DMARC, recipes including PhishRIP vs ZAP, dispositions, actions)
+- **Analyst notes**: typing no longer triggers T/S/C shortcuts (fixed focus/re-render behavior)
+- **URLs**: clean incidents use real vendor homepages; simulated malicious destinations use reserved `.invalid` domains for safe classroom use
 - Realistic incident dataset (threat, spam, clean, quishing, surge events)
 - PhishML scoring, status lifecycle, audit log, and analyst notes
 - Threat actions: PhishRIP, ZAP, PhishFlip, blocklist, and sandbox detonation
