@@ -8,101 +8,130 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark">PhishER</span> Simulator</div>
+    <div class="brand-block">
+      <div class="brand-logo" aria-label="PhishER">ER</div>
+    </div>
     <nav class="top-nav" aria-label="Primary views">
-      <button id="view-inbox" class="view-btn active" aria-label="Open inbox view">Inbox</button>
-      <button id="view-playbook" class="view-btn" aria-label="Open SOC triage playbook">Playbook</button>
-      <button id="view-dashboard" class="view-btn" aria-label="Open dashboard view">Dashboard</button>
-      <button id="help-toggle" aria-label="Open quick start tutorial">Quick Start</button>
+      <button id="view-inbox"     class="view-btn active" aria-label="Open inbox view">Inbox</button>
+      <button id="view-playbook"  class="view-btn"        aria-label="Open SOC triage playbook">Playbook</button>
+      <button id="view-dashboard" class="view-btn"        aria-label="Open dashboard view">Dashboard</button>
+      <button id="view-settings"  class="view-btn"        aria-label="Open settings">Settings</button>
+      <button id="help-toggle"    class="view-btn"        aria-label="Open quick start tutorial">Quick Start</button>
     </nav>
     <div class="top-controls">
       <span id="shift-timer" class="timer" aria-label="SOC shift countdown">30:00</span>
-      <button id="mute-toggle" aria-label="Toggle audio cues">Mute: Off</button>
-      <button id="contrast-toggle" aria-label="Toggle high contrast mode">High Contrast</button>
-      <button id="answer-key-toggle" aria-label="Toggle instructor answer key">Instructor Key</button>
-      <button id="reset-sim" aria-label="Reset lab and clear saved state">Reset Lab</button>
+      <button id="csv-download"       class="btn-outline" aria-label="Download inbox as CSV">Download CSV &#8659;</button>
+      <button id="refresh-btn"        class="btn-outline" aria-label="Refresh inbox">Refresh &#8635;</button>
+      <button id="mute-toggle"        aria-label="Toggle audio cues">Mute: Off</button>
+      <button id="contrast-toggle"    aria-label="Toggle high contrast mode">High Contrast</button>
+      <button id="answer-key-toggle"  aria-label="Toggle instructor answer key">Instructor Key</button>
+      <button id="reset-sim"          aria-label="Reset lab and clear saved state">Reset Lab</button>
     </div>
   </header>
 
+  <!-- ═══════════════════════ INBOX VIEW ═══════════════════════ -->
   <main id="inbox-view" class="layout" aria-label="Phishing triage workspace">
+
+    <!-- LEFT: Rooms + Filters -->
     <section class="pane pane-left" aria-label="Rooms and filters">
-      <h2>Rooms / Filters</h2>
-      <label>Room
-        <select id="room-filter" aria-label="Filter by room">
-          <option value="all">All Rooms</option>
-          <option value="inbox">Inbox</option>
-          <option value="critical">Critical</option>
-          <option value="review">In Review</option>
-          <option value="resolved">Resolved</option>
-        </select>
-      </label>
-      <label>PhishML
-        <select id="phishml-filter" aria-label="Filter by PhishML">
-          <option value="all">All</option>
-          <option value="threat">Threat</option>
-          <option value="spam">Spam</option>
-          <option value="clean">Clean</option>
-        </select>
-      </label>
-      <label>Priority
-        <select id="priority-filter" aria-label="Filter by priority">
-          <option value="all">All</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-      </label>
-      <label>Status
-        <select id="status-filter" aria-label="Filter by status">
-          <option value="all">All</option>
-          <option value="received">Received</option>
-          <option value="in_review">In Review</option>
-          <option value="resolved">Resolved</option>
-        </select>
-      </label>
-      <label>Search
-        <input id="search-filter" aria-label="Search incidents" placeholder="Reporter, subject, sender" />
-      </label>
+
+      <div class="filter-search-row">
+        <input id="search-filter" class="search-input" aria-label="Search incidents" placeholder="Search..." />
+      </div>
+
+      <button id="save-room-btn" class="btn-save-room" aria-label="Save current query as a room">Save query as room</button>
+
+      <div class="filter-group">
+        <div class="filter-group-label">ROOMS</div>
+        <div id="rooms-list" class="rooms-list">
+          <button class="room-item active" data-room="all">All Messages</button>
+          <button class="room-item" data-room="inbox">Inbox</button>
+          <button class="room-item" data-room="critical">Critical</button>
+          <button class="room-item" data-room="review">In Review</button>
+          <button class="room-item" data-room="resolved">Resolved</button>
+        </div>
+        <div id="saved-rooms-list" class="rooms-list"></div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-label">Filter by Category</div>
+        <div class="filter-pills" id="category-pills" role="group" aria-label="Filter by category">
+          <button class="filter-pill pill-unknown active" data-cat="unknown" aria-pressed="true">Unknown</button>
+          <button class="filter-pill pill-clean  active" data-cat="clean"   aria-pressed="true">Clean</button>
+          <button class="filter-pill pill-spam   active" data-cat="spam"    aria-pressed="true">Spam</button>
+          <button class="filter-pill pill-threat active" data-cat="threat"  aria-pressed="true">Threat</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-label">Filter by Status</div>
+        <div class="filter-pills" id="status-pills" role="group" aria-label="Filter by status">
+          <button class="filter-pill active" data-status="received"  aria-pressed="true">Received</button>
+          <button class="filter-pill active" data-status="in_review" aria-pressed="true">In Review</button>
+          <button class="filter-pill active" data-status="resolved"  aria-pressed="true">Resolved</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-group-label">Filter by Priority</div>
+        <div class="filter-pills priority-pills" id="priority-pills" role="group" aria-label="Filter by priority">
+          <button class="filter-pill active" data-priority="unknown"  title="Unknown priority"  aria-pressed="true">?</button>
+          <button class="filter-pill active" data-priority="low"      title="Low priority"      aria-pressed="true">&#8659;&#8659;</button>
+          <button class="filter-pill active" data-priority="medium"   title="Medium priority"   aria-pressed="true">&#8659;</button>
+          <button class="filter-pill active" data-priority="high"     title="High priority"     aria-pressed="true">&#8657;</button>
+          <button class="filter-pill active" data-priority="critical" title="Critical priority" aria-pressed="true">&#8657;&#8657;</button>
+          <button id="filter-settings-icon" class="filter-pill" title="Filter settings" aria-label="Filter settings">&#9881;</button>
+        </div>
+      </div>
     </section>
 
+    <!-- CENTER: Incident Table -->
     <section class="pane pane-center" aria-label="Incident list">
-      <table class="grid">
-        <thead>
-          <tr>
-            <th>[Icon]</th>
-            <th>[Priority]</th>
-            <th>[Reporter]</th>
-            <th>[Subject]</th>
-            <th>[PhishML]</th>
-            <th>[Status]</th>
-            <th>[Date]</th>
-          </tr>
-        </thead>
-        <tbody id="incident-rows"></tbody>
-      </table>
+      <div class="inbox-toolbar">
+        <span id="incident-count" class="incident-count">Loading…</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th class="col-check"><input type="checkbox" id="select-all" aria-label="Select all incidents" /></th>
+              <th class="col-category">Category</th>
+              <th class="col-from">From &#8595;</th>
+              <th class="col-from-email">From (Email)</th>
+              <th class="col-subject">Subject</th>
+              <th class="col-attach" title="Attachment"></th>
+              <th class="col-reported-at">Reported At</th>
+            </tr>
+          </thead>
+          <tbody id="incident-rows"></tbody>
+        </table>
+      </div>
     </section>
 
+    <!-- RIGHT: Triage Sidebar -->
     <aside class="pane pane-right" aria-label="Triage sidebar">
-      <div id="triage-pane"></div>
+      <div id="triage-pane">
+        <p class="triage-placeholder">Select an incident from the list to begin triage.</p>
+      </div>
     </aside>
   </main>
 
+  <!-- ═══════════════════════ PLAYBOOK VIEW ═══════════════════════ -->
   <section id="playbook-view" class="playbook-shell hidden" aria-label="SOC triage playbook">
     <div class="playbook-inner">
       <header class="playbook-hero">
         <p class="playbook-kicker">Learn while you triage</p>
         <h2>SOC Phish Triage Playbook</h2>
-        <p class="playbook-lead">Step-by-step guidance aligned with this simulator: intake → investigate → justify → act → resolve.</p>
+        <p class="playbook-lead">Step-by-step guidance aligned with this simulator: intake &rarr; investigate &rarr; justify &rarr; act &rarr; resolve.</p>
       </header>
 
       <div class="playbook-tabs" role="tablist" aria-label="Playbook sections">
-        <button type="button" class="playbook-tab active" role="tab" aria-selected="true" data-playbook-tab="workflow">Triage workflow</button>
-        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="auth">SPF · DKIM · DMARC</button>
-        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="dispositions">Threat · Spam · Clean</button>
-        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="recipes">Triage recipes</button>
-        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="actions">Response actions</button>
-        <button type="button" class="playbook-tab" role="tab" aria-selected="false" data-playbook-tab="simulator">Using this sim</button>
+        <button type="button" class="playbook-tab active" role="tab" aria-selected="true"  data-playbook-tab="workflow">Triage workflow</button>
+        <button type="button" class="playbook-tab"        role="tab" aria-selected="false" data-playbook-tab="auth">SPF &middot; DKIM &middot; DMARC</button>
+        <button type="button" class="playbook-tab"        role="tab" aria-selected="false" data-playbook-tab="dispositions">Threat &middot; Spam &middot; Clean</button>
+        <button type="button" class="playbook-tab"        role="tab" aria-selected="false" data-playbook-tab="recipes">Triage recipes</button>
+        <button type="button" class="playbook-tab"        role="tab" aria-selected="false" data-playbook-tab="actions">Response actions</button>
+        <button type="button" class="playbook-tab"        role="tab" aria-selected="false" data-playbook-tab="simulator">Using this sim</button>
       </div>
 
       <div id="playbook-panel-workflow" class="playbook-panel" role="tabpanel">
@@ -110,7 +139,7 @@
           <article class="playbook-card">
             <h3><span class="playbook-step">1</span> Intake</h3>
             <ol class="playbook-steps">
-              <li>Open <strong>Inbox</strong>; sort by priority or PhishML (Threat first).</li>
+              <li>Open <strong>Inbox</strong>; filter by Category or Priority.</li>
               <li>Note reporter context (hover name for risk profile).</li>
               <li>Select a row — details load in the right pane.</li>
             </ol>
@@ -126,16 +155,16 @@
             </ol>
           </article>
           <article class="playbook-card playbook-card-wide">
-            <h3><span class="playbook-step">3</span> Decide & document</h3>
+            <h3><span class="playbook-step">3</span> Decide &amp; document</h3>
             <ol class="playbook-steps">
               <li>Choose <strong>Threat</strong>, <strong>Spam</strong>, or <strong>Clean</strong> (or shortcuts <kbd>T</kbd> <kbd>S</kbd> <kbd>C</kbd>).</li>
               <li>Pick a <strong>reason code</strong> that matches evidence.</li>
-              <li>Write analyst notes (min length required before <strong>Resolve</strong>).</li>
+              <li>Write analyst notes (min 20 chars required before <strong>Resolve</strong>).</li>
               <li>Add OSINT/sandbox clips via URLScan or Detonate — they append to notes.</li>
             </ol>
           </article>
           <article class="playbook-card">
-            <h3><span class="playbook-step">4</span> Act & close</h3>
+            <h3><span class="playbook-step">4</span> Act &amp; close</h3>
             <ol class="playbook-steps">
               <li><strong>In Review</strong> while analyzing; <strong>Resolve</strong> when disposition + notes are complete.</li>
               <li>For confirmed malicious mail: <strong>PhishRIP</strong> (same message) or <strong>ZAP</strong> (sender domain).</li>
@@ -155,72 +184,30 @@
           <article class="auth-pill">
             <h4>SPF</h4>
             <p><strong>Sender Policy Framework.</strong> Lists which servers may send mail for a domain (DNS TXT).</p>
-            <p class="auth-result fail"><code>fail</code> — sending IP is not authorized → spoofing risk.</p>
-            <p class="auth-result ok"><code>pass</code> — sending host is allowed → attacker may own a lookalike domain; still analyze body/links.</p>
+            <p class="auth-result fail"><code>fail</code> — sending IP is not authorized &rarr; spoofing risk.</p>
+            <p class="auth-result ok"><code>pass</code> — sending host is allowed &rarr; attacker may own a lookalike domain; still analyze body/links.</p>
           </article>
           <article class="auth-pill">
             <h4>DKIM</h4>
-            <p><strong>DomainKeys Identified Mail.</strong> Cryptographic signature proves the message was not altered in transit for the signing domain.</p>
-            <p class="auth-result fail"><code>fail</code> — signature mismatch → tampering or wrong key.</p>
-            <p class="auth-result ok"><code>pass</code> — signed consistently → still verify it is <em>your</em> trusted domain, not a typosquat.</p>
+            <p><strong>DomainKeys Identified Mail.</strong> Cryptographic signature proves the message was not altered in transit.</p>
+            <p class="auth-result fail"><code>fail</code> — signature mismatch &rarr; tampering or wrong key.</p>
+            <p class="auth-result ok"><code>pass</code> — signed consistently &rarr; still verify it is <em>your</em> trusted domain, not a typosquat.</p>
           </article>
           <article class="auth-pill">
             <h4>DMARC</h4>
             <p><strong>Domain-based Message Authentication.</strong> Tells receivers what to do when SPF/DKIM do not align (policy).</p>
-            <p class="auth-result fail"><code>fail</code> — policy violation / alignment failure → strong spoofing signal.</p>
-            <p class="auth-result ok"><code>pass</code> — aligned with policy → combine with content review.</p>
+            <p class="auth-result fail"><code>fail</code> — policy violation / alignment failure &rarr; strong spoofing signal.</p>
+            <p class="auth-result ok"><code>pass</code> — aligned with policy &rarr; combine with content review.</p>
           </article>
         </div>
         <details class="playbook-more">
           <summary>Quick mental model</summary>
           <ul>
-            <li><strong>SPF</strong> = “Is this mail server allowed to send as this domain?”</li>
-            <li><strong>DKIM</strong> = “Does this message cryptographically match the sender domain?”</li>
-            <li><strong>DMARC</strong> = “What should we do when SPF/DKIM do not align?”</li>
+            <li><strong>SPF</strong> = "Is this mail server allowed to send as this domain?"</li>
+            <li><strong>DKIM</strong> = "Does this message cryptographically match the sender domain?"</li>
+            <li><strong>DMARC</strong> = "What should we do when SPF/DKIM do not align?"</li>
           </ul>
         </details>
-      </div>
-
-      <div id="playbook-panel-recipes" class="playbook-panel" role="tabpanel" hidden>
-        <p class="playbook-intro">Use these like <strong>recipes</strong>: ingredients = evidence you collect; steps = order of operations. Names match buttons in the simulator.</p>
-
-        <article class="recipe-card">
-          <h4>Recipe: PhishRIP vs ZAP (Zero-hour Auto-Purge)</h4>
-          <p><strong>ZAP</strong> here means <em>proactive purge by sender domain</em> — same idea as “zero-hour” response: stop the blast radius early when the <strong>domain</strong> is the threat, not just one copy of the message.</p>
-          <ul class="recipe-steps">
-            <li><strong>PhishRIP</strong> — Remove <em>matching instances of this email</em> (same campaign / fingerprint) across mailboxes. Use when the message body or attachment hash is the smoking gun.</li>
-            <li><strong>ZAP</strong> — Purge or block mail from the <em>same malicious sender domain</em> more broadly. Use when the domain is attacker-controlled and many variants may exist.</li>
-            <li><strong>Rule of thumb:</strong> same template everywhere → PhishRIP first; poisoned domain still pumping mail → ZAP.</li>
-          </ul>
-        </article>
-
-        <article class="recipe-card">
-          <h4>Recipe: Likely malware / credential phishing (Threat)</h4>
-          <ol class="recipe-steps">
-            <li>Confirm classification: Threat + reason (e.g. Malicious Link, Domain Spoofing).</li>
-            <li>Evidence: paste OSINT / detonation lines into notes.</li>
-            <li>Contain: Run <strong>PhishRIP</strong> if policy matches; add <strong>ZAP</strong> if the domain is the root problem.</li>
-            <li>Resolve with ≥20 chars explaining why.</li>
-          </ol>
-        </article>
-
-        <article class="recipe-card">
-          <h4>Recipe: Probably unwanted but not malware (Spam)</h4>
-          <ol class="recipe-steps">
-            <li>Spam + reason (Social Engineering, Authentication Failure, etc.).</li>
-            <li>Block or tag per playbook; escalate to Threat if indicators worsen.</li>
-            <li>Resolve with coaching notes for the reporter if useful.</li>
-          </ol>
-        </article>
-
-        <article class="recipe-card">
-          <h4>Recipe: Verified legitimate (Clean)</h4>
-          <ol class="recipe-steps">
-            <li>Clean + Known Safe Sender / Internal Communication.</li>
-            <li>Headers + links align; no credential asks.</li>
-            <li>Resolve so the reporter gets closure.</li>
-          </ol>
-        </article>
       </div>
 
       <div id="playbook-panel-dispositions" class="playbook-panel" role="tabpanel" hidden>
@@ -254,14 +241,52 @@
         </div>
       </div>
 
+      <div id="playbook-panel-recipes" class="playbook-panel" role="tabpanel" hidden>
+        <p class="playbook-intro">Use these like <strong>recipes</strong>: ingredients = evidence you collect; steps = order of operations. Names match buttons in the simulator.</p>
+        <article class="recipe-card">
+          <h4>Recipe: PhishRIP vs ZAP (Zero-hour Auto-Purge)</h4>
+          <p><strong>ZAP</strong> here means <em>proactive purge by sender domain</em> — same idea as "zero-hour" response.</p>
+          <ul class="recipe-steps">
+            <li><strong>PhishRIP</strong> — Remove <em>matching instances of this email</em> (same campaign fingerprint) across mailboxes.</li>
+            <li><strong>ZAP</strong> — Purge or block mail from the <em>same malicious sender domain</em> more broadly.</li>
+            <li><strong>Rule of thumb:</strong> same template everywhere &rarr; PhishRIP first; poisoned domain still pumping mail &rarr; ZAP.</li>
+          </ul>
+        </article>
+        <article class="recipe-card">
+          <h4>Recipe: Likely malware / credential phishing (Threat)</h4>
+          <ol class="recipe-steps">
+            <li>Confirm classification: Threat + reason (e.g. Malicious Link, Domain Spoofing).</li>
+            <li>Evidence: paste OSINT / detonation lines into notes.</li>
+            <li>Contain: Run <strong>PhishRIP</strong> if policy matches; add <strong>ZAP</strong> if the domain is the root problem.</li>
+            <li>Resolve with &ge;20 chars explaining why.</li>
+          </ol>
+        </article>
+        <article class="recipe-card">
+          <h4>Recipe: Probably unwanted but not malware (Spam)</h4>
+          <ol class="recipe-steps">
+            <li>Spam + reason (Social Engineering, Authentication Failure, etc.).</li>
+            <li>Block or tag per playbook; escalate to Threat if indicators worsen.</li>
+            <li>Resolve with coaching notes for the reporter if useful.</li>
+          </ol>
+        </article>
+        <article class="recipe-card">
+          <h4>Recipe: Verified legitimate (Clean)</h4>
+          <ol class="recipe-steps">
+            <li>Clean + Known Safe Sender / Internal Communication.</li>
+            <li>Headers + links align; no credential asks.</li>
+            <li>Resolve so the reporter gets closure.</li>
+          </ol>
+        </article>
+      </div>
+
       <div id="playbook-panel-actions" class="playbook-panel" role="tabpanel" hidden>
         <dl class="action-dl">
           <dt>Assign / In Review / Resolve</dt>
-          <dd>Lifecycle: received → in review → resolved. Resolve requires reason + sufficient notes.</dd>
+          <dd>Lifecycle: received &rarr; in review &rarr; resolved. Resolve requires reason + sufficient notes.</dd>
           <dt>PhishRIP</dt>
           <dd>Simulates removing <strong>matching message instances</strong> across the tenant.</dd>
           <dt>ZAP (Zero-hour Auto-Purge style)</dt>
-          <dd><strong>Why it exists:</strong> Some campaigns rotate subjects but reuse a bad domain. ZAP simulates <strong>organization-wide action against that sender domain</strong> — faster than remediating one message at a time. In this lab it complements PhishRIP (same message) vs domain-level cleanup.</dd>
+          <dd><strong>Why it exists:</strong> Some campaigns rotate subjects but reuse a bad domain. ZAP simulates <strong>org-wide action against that sender domain</strong> — faster than remediating one message at a time.</dd>
           <dt>PhishFlip</dt>
           <dd>Turns a contained threat into a <strong>training simulation</strong> narrative.</dd>
           <dt>URLScan</dt>
@@ -273,7 +298,9 @@
 
       <div id="playbook-panel-simulator" class="playbook-panel" role="tabpanel" hidden>
         <ul class="sim-tips">
+          <li><strong>Category badges</strong> — start as <em>Unknown</em> until PhishML confidence &ge; threshold or you manually classify.</li>
           <li><strong>Instructor Key</strong> — reveals debrief hints in Headers/Auth for class review.</li>
+          <li><strong>Settings &rarr; PhishML</strong> — adjust confidence thresholds; watch how auto-classification changes.</li>
           <li><strong>Dashboard</strong> — accuracy and disposition mix; download Shift Report for submissions.</li>
           <li><strong>Final 5</strong> — timer under 5 minutes injects surge traffic; stay calm and prioritize.</li>
           <li><strong>High Contrast / Mute</strong> — accessibility; audio cues fire on resolve, detonation, surge.</li>
@@ -288,16 +315,39 @@
     </div>
   </section>
 
+  <!-- ═══════════════════════ DASHBOARD VIEW ═══════════════════════ -->
   <section id="dashboard-view" class="dashboard hidden" aria-label="Global analytics dashboard">
     <h2>Global Analytics</h2>
     <button id="download-report" aria-label="Download shift report">Download Shift Report</button>
     <div id="analytics-content"></div>
   </section>
 
+  <!-- ═══════════════════════ SETTINGS VIEW ═══════════════════════ -->
+  <section id="settings-view" class="settings-shell hidden" aria-label="Settings">
+    <div class="settings-layout">
+      <nav class="settings-sidebar" aria-label="Settings navigation">
+        <div class="settings-group-label">ACCOUNT</div>
+        <button class="settings-nav-item settings-nav-stub">Reporting Emails</button>
+        <button class="settings-nav-item settings-nav-stub">Email Server</button>
+        <button class="settings-nav-item settings-nav-stub">Email Templates</button>
+        <button class="settings-nav-item settings-nav-stub">Data Retention</button>
+        <div class="settings-group-label">INTEGRATIONS</div>
+        <button class="settings-nav-item settings-nav-stub">VirusTotal</button>
+        <button class="settings-nav-item settings-nav-stub">Syslog</button>
+        <div class="settings-group-label">KNOWBE4 LABS</div>
+        <button class="settings-nav-item active" id="phishml-nav-btn">PhishML</button>
+      </nav>
+      <div class="settings-content" id="settings-content">
+        <!-- Rendered by renderPhishMLSettings() -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ MODALS ═══════════════════════ -->
   <div id="phishrip-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="PhishRIP simulation">
     <div class="modal-card">
       <h3>PhishRIP Simulation</h3>
-      <p id="phishrip-text">Scanning 5,000 mailboxes...</p>
+      <p id="phishrip-text">Scanning 5,000 mailboxes…</p>
       <div class="progress"><div id="phishrip-bar" class="bar"></div></div>
       <button id="close-modal" aria-label="Close PhishRIP modal">Close</button>
     </div>
@@ -311,15 +361,30 @@
     </div>
   </div>
 
+  <div id="save-room-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Save room">
+    <div class="modal-card">
+      <h3>Save Query as Room</h3>
+      <p>Give this filter preset a name to access it quickly from the Rooms list.</p>
+      <label>Room name
+        <input id="room-name-input" placeholder="e.g. High Priority Threats" maxlength="40" />
+      </label>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="confirm-save-room" class="btn-primary" style="flex:1">Save Room</button>
+        <button id="cancel-save-room" style="flex:1">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <div id="quickstart-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Quick start tutorial">
     <div class="modal-card">
-      <h3>New Recruit Quick Start</h3>
-      <p><strong>1.</strong> Monitor the Inbox for priority and PhishML cues.</p>
-      <p><strong>2.</strong> Investigate Headers, Auth, Links, and Attachments before acting.</p>
-      <p><strong>3.</strong> Justify your triage with reason code + evidence-backed notes.</p>
-      <button id="close-quickstart" aria-label="Close quick start tutorial">Start Shift</button>
+      <h3>&#127358; New Recruit Quick Start</h3>
+      <p><strong>1.</strong> Monitor the Inbox — items start as <em>Unknown</em> until PhishML or you classifies them.</p>
+      <p><strong>2.</strong> Click a row, then investigate using the Headers, Auth, Links, and Attachments tabs.</p>
+      <p><strong>3.</strong> Classify the email (Threat / Spam / Clean), pick a reason code, write notes, then Resolve.</p>
+      <p><strong>4.</strong> Go to <strong>Settings &rarr; PhishML</strong> to see how confidence thresholds affect auto-classification.</p>
+      <button id="close-quickstart" aria-label="Close quick start tutorial">Start Shift &#9654;</button>
     </div>
   </div>
 
